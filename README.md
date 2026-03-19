@@ -162,16 +162,20 @@ This creates:
 
 ### JWT Secret Generation
 
+The application uses HS512 algorithm which requires a **Base64-encoded key of at least 64 bytes (512 bits)**.
+
 Generate a secure JWT secret:
 ```bash
 openssl rand -base64 64
 ```
 
-Update `application.yml`:
+Set the environment variable or update `application.yml`:
 ```yaml
 jwt:
   secret: ${JWT_SECRET:your-generated-secret}
 ```
+
+**Note**: The secret must be Base64-encoded. Plain text secrets will cause signature errors with HS512.
 
 ## Database Schema
 
