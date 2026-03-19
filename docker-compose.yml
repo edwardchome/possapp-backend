@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: possapp-postgres
+    environment:
+      POSTGRES_DB: possapp
+      POSTGRES_USER: possapp
+      POSTGRES_PASSWORD: possapp123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U possapp"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - possapp-network
+
+  # Optional: PGAdmin for database management
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: possapp-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@possapp.com
+      PGADMIN_DEFAULT_PASSWORD: admin123
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+    networks:
+      - possapp-network
+    profiles:
+      - tools
+
+volumes:
+  postgres_data:
+
+networks:
+  possapp-network:
+    driver: bridge
