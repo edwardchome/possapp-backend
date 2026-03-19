@@ -6,6 +6,7 @@ import com.possapp.backend.dto.AuthResponse;
 import com.possapp.backend.dto.UserDto;
 import com.possapp.backend.security.JwtTokenProvider;
 import com.possapp.backend.service.UserService;
+import com.possapp.backend.tenant.TenantContext;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -62,8 +63,16 @@ public class AuthController {
         
         SecurityContextHolder.getContext().setAuthentication(authentication);
         
-        String token = jwtTokenProvider.generateToken(authentication);
-        String refreshToken = jwtTokenProvider.generateRefreshToken(request.getEmail());
+        // Get current tenant ID for token
+        String tenantId = TenantContext.getCurrentTenant();
+        if (tenantId == null) {
+            log.error("No tenant context found during login for user: {}", request.getEmail());
+            return ResponseEntity.status(400)
+                .body(ApiResponse.<AuthResponse>error("Tenant context required"));
+        }
+        
+        String token = jwtTokenProvider.generateToken(authentication, tenantId);
+        String refreshToken = jwtTokenProvider.generateRefreshToken(request.getEmail(), tenantId);
         
         userService.updateLastLogin(request.getEmail());
         UserDto userDto = userService.getUserProfile(request.getEmail());
@@ -106,8 +115,16 @@ public class AuthController {
             
             SecurityContextHolder.getContext().setAuthentication(authentication);
             
-            String token = jwtTokenProvider.generateToken(authentication);
-            String refreshToken = jwtTokenProvider.generateRefreshToken(request.getEmail());
+            // Get current tenant ID for token
+            String tenantId = TenantContext.getCurrentTenant();
+            if (tenantId == null) {
+                log.error("No tenant context found during registration for user: {}", request.getEmail());
+                return ResponseEntity.status(400)
+                    .body(ApiResponse.<AuthResponse>error("Tenant context required"));
+            }
+            
+            String token = jwtTokenProvider.generateToken(authentication, tenantId);
+            String refreshToken = jwtTokenProvider.generateRefreshToken(request.getEmail(), tenantId);
             
             AuthResponse authResponse = AuthResponse.builder()
                 .token(token)
@@ -129,21 +146,24 @@ public class AuthController {
     @PostMapping("/refresh")
     @Operation(
         summary = "Refresh token",
-        description = "Get new access token using refresh token"
+        description = "Get new access token using refresh token. Requires X-Tenant-ID header."
     )
     public ResponseEntity<ApiResponse<AuthResponse>> refreshToken(
             @Parameter(description = "Refresh token request", required = true)
-            @RequestBody Map<String, String> request) {
+            @RequestBody Map<String, String> request,
+            @Parameter(description = "Tenant ID", required = true)
+            @RequestHeader("X-Tenant-ID") String tenantId) {
         String refreshToken = request.get("refreshToken");
         
-        if (!jwtTokenProvider.validateToken(refreshToken)) {
+        // Validate that the refresh token belongs to the requesting tenant
+        if (!jwtTokenProvider.validateTokenForTenant(refreshToken, tenantId)) {
             return ResponseEntity.status(401)
-                .body(ApiResponse.error("Invalid refresh token"));
+                .body(ApiResponse.error("Invalid refresh token or tenant mismatch"));
         }
         
         String email = jwtTokenProvider.getUsernameFromToken(refreshToken);
-        String newToken = jwtTokenProvider.generateToken(email);
-        String newRefreshToken = jwtTokenProvider.generateRefreshToken(email);
+        String newToken = jwtTokenProvider.generateToken(email, tenantId);
+        String newRefreshToken = jwtTokenProvider.generateRefreshToken(email, tenantId);
         
         UserDto userDto = userService.getUserProfile(email);
         

@@ -31,40 +31,43 @@ public class JwtTokenProvider {
         return Keys.hmacShaKeyFor(keyBytes);
     }
     
-    public String generateToken(Authentication authentication) {
+    public String generateToken(Authentication authentication, String tenantId) {
         String username = authentication.getName();
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + jwtExpirationMs);
         
         return Jwts.builder()
             .subject(username)
+            .claim("tenantId", tenantId)
             .issuedAt(now)
             .expiration(expiryDate)
             .signWith(getSigningKey(), Jwts.SIG.HS512)
             .compact();
     }
     
-    public String generateToken(String email) {
+    public String generateToken(String email, String tenantId) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + jwtExpirationMs);
         
         return Jwts.builder()
             .subject(email)
+            .claim("tenantId", tenantId)
             .issuedAt(now)
             .expiration(expiryDate)
             .signWith(getSigningKey(), Jwts.SIG.HS512)
             .compact();
     }
     
-    public String generateRefreshToken(String email) {
+    public String generateRefreshToken(String email, String tenantId) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + refreshExpirationMs);
         
         return Jwts.builder()
             .subject(email)
+            .claim("tenantId", tenantId)
+            .claim("tokenType", "refresh")
             .issuedAt(now)
             .expiration(expiryDate)
-            .claim("tokenType", "refresh")
             .signWith(getSigningKey(), Jwts.SIG.HS512)
             .compact();
     }
@@ -77,6 +80,16 @@ public class JwtTokenProvider {
             .getPayload();
         
         return claims.getSubject();
+    }
+    
+    public String getTenantIdFromToken(String token) {
+        Claims claims = Jwts.parser()
+            .verifyWith(getSigningKey())
+            .build()
+            .parseSignedClaims(token)
+            .getPayload();
+        
+        return claims.get("tenantId", String.class);
     }
     
     public boolean validateToken(String token) {
@@ -98,6 +111,25 @@ public class JwtTokenProvider {
             log.error("JWT claims string is empty");
         }
         return false;
+    }
+    
+    public boolean validateTokenForTenant(String token, String requestTenantId) {
+        if (!validateToken(token)) {
+            return false;
+        }
+        
+        String tokenTenantId = getTenantIdFromToken(token);
+        if (tokenTenantId == null) {
+            log.error("JWT token missing tenantId claim");
+            return false;
+        }
+        
+        if (!tokenTenantId.equals(requestTenantId)) {
+            log.error("Tenant ID mismatch: token tenant={}, request tenant={}", tokenTenantId, requestTenantId);
+            return false;
+        }
+        
+        return true;
     }
     
     public String resolveToken(HttpServletRequest request) {

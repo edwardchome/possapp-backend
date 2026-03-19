@@ -195,7 +195,7 @@ public class TenantService {
         // Receipt items table
         statement.executeUpdate(String.format("""
             CREATE TABLE IF NOT EXISTS %s.receipt_items (
-                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                id VARCHAR(36) PRIMARY KEY DEFAULT gen_random_uuid()::text,
                 receipt_id VARCHAR(100) NOT NULL REFERENCES %s.receipts(id) ON DELETE CASCADE,
                 product_code VARCHAR(100) NOT NULL,
                 product_name VARCHAR(255) NOT NULL,

@@ -1,5 +1,6 @@
 package com.possapp.backend.security;
 
+import com.possapp.backend.tenant.TenantContext;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -29,34 +30,56 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, 
                                      FilterChain filterChain) throws ServletException, IOException {
-        String currentTenant = com.possapp.backend.tenant.TenantContext.getCurrentTenant();
-        log.info("JWT FILTER START - Tenant context: {}", currentTenant);
+        String currentTenant = TenantContext.getCurrentTenant();
         
         try {
             String jwt = getJwtFromRequest(request);
-            log.info("JWT token present: {}", StringUtils.hasText(jwt));
+            log.debug("JWT token present: {}", StringUtils.hasText(jwt));
             
-            if (StringUtils.hasText(jwt) && jwtTokenProvider.validateToken(jwt)) {
+            if (StringUtils.hasText(jwt)) {
+                // Validate token and tenant match
+                if (!jwtTokenProvider.validateToken(jwt)) {
+                    log.warn("JWT token is invalid or expired");
+                    filterChain.doFilter(request, response);
+                    return;
+                }
+                
+                // Get tenant from token and validate against request tenant
+                String tokenTenantId = jwtTokenProvider.getTenantIdFromToken(jwt);
+                
+                if (tokenTenantId == null) {
+                    log.warn("JWT token missing tenantId claim - rejecting request");
+                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                    response.getWriter().write("{\"error\":\"Token missing tenant information\"}");
+                    return;
+                }
+                
+                if (currentTenant == null || !currentTenant.equals(tokenTenantId)) {
+                    log.error("TENANT MISMATCH: Token tenant={}, Request tenant={}", tokenTenantId, currentTenant);
+                    response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                    response.getWriter().write("{\"error\":\"Cross-tenant access denied\"}");
+                    return;
+                }
+                
                 String username = jwtTokenProvider.getUsernameFromToken(jwt);
-                log.info("JWT valid for user: {}", username);
+                log.debug("JWT valid for user: {} in tenant: {}", username, tokenTenantId);
                 
                 UserDetails userDetails = userDetailsService.loadUserByUsername(username);
-                log.info("UserDetails loaded: {}", userDetails.getUsername());
+                log.debug("UserDetails loaded: {}", userDetails.getUsername());
                 
                 UsernamePasswordAuthenticationToken authentication = 
                     new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
                 authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                 
                 SecurityContextHolder.getContext().setAuthentication(authentication);
-                log.info("Authentication set in security context");
+                log.debug("Authentication set in security context");
             } else {
-                log.warn("JWT missing or invalid");
+                log.debug("No JWT token in request");
             }
         } catch (Exception ex) {
             log.error("JWT FILTER EXCEPTION: {}", ex.getMessage(), ex);
         }
         
-        log.info("JWT FILTER END - Continuing chain");
         filterChain.doFilter(request, response);
     }
     
