@@ -36,11 +36,14 @@ public class SchemaMultiTenantConnectionProvider implements MultiTenantConnectio
         try {
             // Use the tenant schema
             String schema = tenantIdentifier != null ? tenantIdentifier : DEFAULT_SCHEMA;
-            log.debug("Switching to schema: {}", schema);
-            connection.setSchema(schema);
+            
+            // Use SET search_path for PostgreSQL
+            try (var stmt = connection.createStatement()) {
+                stmt.execute("SET search_path TO \"" + schema + "\", public");
+            }
         } catch (SQLException e) {
-            log.error("Could not alter JDBC connection to specified schema [{}]", tenantIdentifier, e);
-            throw new SQLException("Could not alter JDBC connection to specified schema [" + tenantIdentifier + "]", e);
+            log.error("Could not set search_path to schema [{}]", tenantIdentifier, e);
+            throw new SQLException("Could not set search_path to schema [" + tenantIdentifier + "]", e);
         }
         return connection;
     }
@@ -48,9 +51,12 @@ public class SchemaMultiTenantConnectionProvider implements MultiTenantConnectio
     @Override
     public void releaseConnection(String tenantIdentifier, Connection connection) throws SQLException {
         try {
-            connection.setSchema(DEFAULT_SCHEMA);
+            // Reset search_path to default before returning to pool
+            try (var stmt = connection.createStatement()) {
+                stmt.execute("SET search_path TO public");
+            }
         } catch (SQLException e) {
-            log.warn("Could not reset schema to default", e);
+            log.warn("Could not reset search_path", e);
         }
         connection.close();
     }
