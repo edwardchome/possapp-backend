@@ -5,7 +5,6 @@ import com.possapp.backend.dto.TenantRegistrationRequest;
 import com.possapp.backend.entity.Tenant;
 import com.possapp.backend.exception.TenantException;
 import com.possapp.backend.repository.TenantRepository;
-import com.possapp.backend.tenant.TenantContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -15,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.LocalDateTime;
@@ -28,7 +28,6 @@ public class TenantService {
     private final TenantRepository tenantRepository;
     private final JdbcTemplate jdbcTemplate;
     private final DataSource dataSource;
-    private final UserService userService;
     private final PasswordEncoder passwordEncoder;
     
     @Transactional(readOnly = true)
@@ -76,23 +75,17 @@ public class TenantService {
         
         tenant = tenantRepository.save(tenant);
         
-        // Create the tenant schema and tables
-        createTenantSchema(schemaName);
-        
-        // Create admin user in tenant schema
-        try {
-            TenantContext.setCurrentTenant(schemaName);
-            userService.createAdminUser(request.getAdminEmail(), passwordEncoder.encode(request.getPassword()));
-        } finally {
-            TenantContext.clear();
-        }
+        // Create the tenant schema, tables, and admin user
+        // Note: We commit the tenant record first so the transaction is complete
+        // before we create schema objects
+        createTenantSchemaAndAdmin(schemaName, request.getAdminEmail(), request.getPassword());
         
         log.info("Successfully created tenant: {} with schema: {}", request.getCompanyName(), schemaName);
         
         return mapToDto(tenant);
     }
     
-    private void createTenantSchema(String schemaName) {
+    private void createTenantSchemaAndAdmin(String schemaName, String adminEmail, String plainPassword) {
         try (Connection connection = dataSource.getConnection();
              Statement statement = connection.createStatement()) {
             
@@ -109,9 +102,30 @@ public class TenantService {
                 schemaName
             ));
             
+            // Create admin user directly using JDBC to ensure correct schema
+            String encodedPassword = passwordEncoder.encode(plainPassword);
+            createAdminUserInSchema(connection, schemaName, adminEmail, encodedPassword);
+            
+            log.info("Created admin user in schema: {}", schemaName);
+            
         } catch (SQLException e) {
             log.error("Failed to create tenant schema: {}", schemaName, e);
             throw new TenantException("Failed to create tenant schema: " + e.getMessage());
+        }
+    }
+    
+    private void createAdminUserInSchema(Connection connection, String schemaName, String email, String encodedPassword) throws SQLException {
+        String sql = String.format(
+            "INSERT INTO %s.users (id, email, password, role, is_active, email_verified, created_at, updated_at) " +
+            "VALUES (gen_random_uuid(), ?, ?, 'ADMIN', true, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+            schemaName
+        );
+        
+        try (PreparedStatement ps = connection.prepareStatement(sql)) {
+            ps.setString(1, email);
+            ps.setString(2, encodedPassword);
+            int rowsAffected = ps.executeUpdate();
+            log.info("Admin user insert affected {} rows in schema {}", rowsAffected, schemaName);
         }
     }
     
@@ -119,7 +133,7 @@ public class TenantService {
         // Users table
         statement.executeUpdate(String.format("""
             CREATE TABLE IF NOT EXISTS %s.users (
-                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                id VARCHAR(36) PRIMARY KEY DEFAULT gen_random_uuid()::text,
                 email VARCHAR(255) NOT NULL UNIQUE,
                 password VARCHAR(255) NOT NULL,
                 first_name VARCHAR(100),

@@ -18,9 +18,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -35,6 +38,7 @@ public class AuthController {
     private final AuthenticationManager authenticationManager;
     private final JwtTokenProvider jwtTokenProvider;
     private final UserService userService;
+    private final PasswordEncoder passwordEncoder;
     
     @PostMapping("/login")
     @Operation(
@@ -84,31 +88,42 @@ public class AuthController {
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Registration successful"),
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "User already exists or invalid data")
     })
+    @Transactional
     public ResponseEntity<ApiResponse<AuthResponse>> register(
             @Parameter(description = "Registration details", required = true)
             @Valid @RequestBody AuthRequest request) {
         log.info("Registration attempt for: {}", request.getEmail());
         
-        var user = userService.createUser(request.getEmail(), request.getPassword(), null, null);
+        // Encode password before saving
+        String encodedPassword = passwordEncoder.encode(request.getPassword());
+        var user = userService.createUser(request.getEmail(), encodedPassword, null, null);
         
-        Authentication authentication = authenticationManager.authenticate(
-            new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
-        );
-        
-        SecurityContextHolder.getContext().setAuthentication(authentication);
-        
-        String token = jwtTokenProvider.generateToken(authentication);
-        String refreshToken = jwtTokenProvider.generateRefreshToken(request.getEmail());
-        
-        AuthResponse authResponse = AuthResponse.builder()
-            .token(token)
-            .refreshToken(refreshToken)
-            .tokenType("Bearer")
-            .expiresIn(jwtTokenProvider.getExpirationTime() / 1000)
-            .user(userService.mapToDto(user))
-            .build();
-        
-        return ResponseEntity.ok(ApiResponse.success("Registration successful", authResponse));
+        try {
+            // Authenticate the newly created user
+            Authentication authentication = authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
+            );
+            
+            SecurityContextHolder.getContext().setAuthentication(authentication);
+            
+            String token = jwtTokenProvider.generateToken(authentication);
+            String refreshToken = jwtTokenProvider.generateRefreshToken(request.getEmail());
+            
+            AuthResponse authResponse = AuthResponse.builder()
+                .token(token)
+                .refreshToken(refreshToken)
+                .tokenType("Bearer")
+                .expiresIn(jwtTokenProvider.getExpirationTime() / 1000)
+                .user(userService.mapToDto(user))
+                .build();
+            
+            return ResponseEntity.ok(ApiResponse.success("Registration successful", authResponse));
+            
+        } catch (BadCredentialsException e) {
+            log.error("Authentication failed for newly created user: {}", request.getEmail());
+            // Transaction will rollback since exception propagates
+            throw new BadCredentialsException("Authentication failed after registration");
+        }
     }
     
     @PostMapping("/refresh")

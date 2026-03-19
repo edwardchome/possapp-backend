@@ -44,6 +44,7 @@ public class ProductService {
     
     @Transactional
     public ProductDto createProduct(CreateProductRequest request) {
+        
         if (productRepository.existsByCode(request.getCode())) {
             throw new ProductException("Product with code already exists: " + request.getCode());
         }

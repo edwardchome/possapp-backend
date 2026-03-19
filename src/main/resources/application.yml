@@ -18,7 +18,7 @@ spring:
       connection-timeout: 30000
       idle-timeout: 600000
       max-lifetime: 1800000
-      schema: public
+      # Note: Do NOT set schema here - multi-tenancy handles schema switching
   
   jpa:
     hibernate:
@@ -29,9 +29,10 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
-        show_sql: false
-        default_schema: public
+        show_sql: true
+        # NOTE: Do NOT set default_schema - multi-tenancy handles schema switching
         multiTenancy: SCHEMA
+        connection.handling_mode: DELAYED_ACQUISITION_AND_HOLD
     open-in-view: false
   
   flyway:
