@@ -1,0 +1,53 @@
+[Unit]
+Description=PossApp Backend API
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=possapp
+Group=possapp
+
+# Working directory
+WorkingDirectory=/opt/possapp
+
+# Environment variables
+Environment="APP_BASE_URL=https://inventory-app.net.tr"
+Environment="SPRING_PROFILES_ACTIVE=prod"
+Environment="SERVER_PORT=8080"
+
+# Optional: Uncomment and set these as needed
+# Environment="JWT_SECRET=your-secure-jwt-secret-here"
+# Environment="DB_HOST=localhost"
+# Environment="DB_PORT=5432"
+# Environment="DB_NAME=possapp_db"
+# Environment="DB_USER=postgres"
+# Environment="DB_PASSWORD=your-database-password"
+# Environment="SMTP_HOST=smtp.gmail.com"
+# Environment="SMTP_PORT=587"
+# Environment="SMTP_USERNAME=your-email@gmail.com"
+# Environment="SMTP_PASSWORD=your-app-password"
+
+# Java command
+ExecStart=/usr/bin/java -jar /opt/possapp/possapp-backend-1.0.0.jar
+
+# Restart policy
+Restart=always
+RestartSec=10
+
+# Graceful shutdown
+TimeoutStopSec=30
+KillSignal=SIGTERM
+
+# Logging
+StandardOutput=append:/var/log/possapp/app.log
+StandardError=append:/var/log/possapp/error.log
+
+# Security
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/log/possapp
+
+[Install]
+WantedBy=multi-user.target
