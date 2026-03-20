@@ -53,6 +53,10 @@ public class User {
     @Column(name = "email_verification_expiry")
     private LocalDateTime emailVerificationExpiry;
     
+    @Column(name = "password_change_required", nullable = false)
+    @Builder.Default
+    private boolean passwordChangeRequired = false;
+    
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

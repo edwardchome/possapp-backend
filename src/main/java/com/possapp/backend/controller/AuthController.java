@@ -262,4 +262,31 @@ public class AuthController {
         SecurityContextHolder.clearContext();
         return ResponseEntity.ok(ApiResponse.success("Account deleted", null));
     }
+    
+    @PostMapping("/change-password")
+    @Operation(
+        summary = "Change password",
+        description = "Change user password. Clears passwordChangeRequired flag on first login.",
+        security = @SecurityRequirement(name = "bearerAuth")
+    )
+    public ResponseEntity<ApiResponse<Void>> changePassword(
+            @Parameter(description = "Password change request", required = true)
+            @RequestBody Map<String, String> request) {
+        UserDto currentUser = userService.getCurrentUser();
+        if (currentUser == null) {
+            return ResponseEntity.status(401)
+                .body(ApiResponse.error("Not authenticated"));
+        }
+        
+        String currentPassword = request.get("currentPassword");
+        String newPassword = request.get("newPassword");
+        
+        if (currentPassword == null || newPassword == null) {
+            return ResponseEntity.badRequest()
+                .body(ApiResponse.error("Current password and new password are required"));
+        }
+        
+        userService.changePassword(currentUser.getEmail(), currentPassword, newPassword);
+        return ResponseEntity.ok(ApiResponse.success("Password changed successfully", null));
+    }
 }

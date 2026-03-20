@@ -24,6 +24,7 @@ public class UserDto {
     private String role;
     private boolean active;
     private boolean emailVerified;
+    private boolean passwordChangeRequired;
     private LocalDateTime createdAt;
     private LocalDateTime lastLoginAt;
 }

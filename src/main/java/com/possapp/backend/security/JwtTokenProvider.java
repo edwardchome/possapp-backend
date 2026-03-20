@@ -36,9 +36,16 @@ public class JwtTokenProvider {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + jwtExpirationMs);
         
+        // Extract role from authorities
+        String role = authentication.getAuthorities().stream()
+            .findFirst()
+            .map(auth -> auth.getAuthority().replace("ROLE_", ""))
+            .orElse("USER");
+        
         return Jwts.builder()
             .subject(username)
             .claim("tenantId", tenantId)
+            .claim("role", role)
             .issuedAt(now)
             .expiration(expiryDate)
             .signWith(getSigningKey(), Jwts.SIG.HS512)

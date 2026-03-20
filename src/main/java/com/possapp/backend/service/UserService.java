@@ -12,6 +12,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,6 +25,7 @@ import java.util.Map;
 public class UserService implements UserDetailsService {
     
     private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
     
     @Override
     @Transactional(readOnly = true)
@@ -136,6 +138,22 @@ public class UserService implements UserDetailsService {
         userRepository.save(user);
     }
     
+    @Transactional
+    public void changePassword(String email, String currentPassword, String newPassword) {
+        User user = userRepository.findByEmail(email)
+            .orElseThrow(() -> new UserException("User not found"));
+        
+        // Verify current password
+        if (!passwordEncoder.matches(currentPassword, user.getPassword())) {
+            throw new UserException("Current password is incorrect");
+        }
+        
+        // Update password and clear passwordChangeRequired flag
+        user.setPassword(passwordEncoder.encode(newPassword));
+        user.setPasswordChangeRequired(false);
+        userRepository.save(user);
+    }
+    
     public UserDto mapToDto(User user) {
         return UserDto.builder()
             .id(user.getId())
@@ -147,6 +165,7 @@ public class UserService implements UserDetailsService {
             .role(user.getRole())
             .active(user.isActive())
             .emailVerified(user.isEmailVerified())
+            .passwordChangeRequired(user.isPasswordChangeRequired())
             .createdAt(user.getCreatedAt())
             .lastLoginAt(user.getLastLoginAt())
             .build();

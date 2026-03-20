@@ -120,8 +120,8 @@ public class TenantService {
     
     private void createAdminUserInSchema(Connection connection, String schemaName, String email, String encodedPassword) throws SQLException {
         String sql = String.format(
-            "INSERT INTO %s.users (id, email, password, role, is_active, email_verified, created_at, updated_at) " +
-            "VALUES (gen_random_uuid(), ?, ?, 'ADMIN', true, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+            "INSERT INTO %s.users (id, email, password, role, is_active, email_verified, password_change_required, created_at, updated_at) " +
+            "VALUES (gen_random_uuid(), ?, ?, 'ADMIN', true, true, false, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
             schemaName
         );
         
@@ -148,6 +148,7 @@ public class TenantService {
                 email_verified BOOLEAN NOT NULL DEFAULT false,
                 email_verification_token VARCHAR(255),
                 email_verification_expiry TIMESTAMP,
+                password_change_required BOOLEAN NOT NULL DEFAULT false,
                 created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 last_login_at TIMESTAMP

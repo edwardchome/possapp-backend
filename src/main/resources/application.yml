@@ -1,5 +1,5 @@
 server:
-  port: 8040
+  port: 8080 # Change to 8040 for production
   servlet:
     context-path: /
 

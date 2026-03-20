@@ -187,4 +187,75 @@ public class EmailService {
             resetLink, resetLink
         );
     }
+    
+    /**
+     * Send welcome email to new user with login credentials
+     */
+    public void sendWelcomeEmail(String toEmail, String plainPassword, String tenantId, String firstName) {
+        String subject = "Welcome to PossApp - Your Account Details";
+        String loginUrl = buildLoginUrl();
+        String htmlBody = buildWelcomeEmailBody(toEmail, plainPassword, tenantId, firstName, loginUrl);
+        
+        sendHtmlEmail(toEmail, subject, htmlBody);
+    }
+    
+    private String buildLoginUrl() {
+        String baseUrl = System.getenv("APP_BASE_URL");
+        if (baseUrl == null || baseUrl.isEmpty()) {
+            baseUrl = "http://localhost:8080";
+        }
+        return baseUrl;
+    }
+    
+    private String buildWelcomeEmailBody(String email, String password, String tenantId, String firstName, String loginUrl) {
+        String name = firstName != null && !firstName.isEmpty() ? firstName : email;
+        return String.format(
+            "<!DOCTYPE html>" +
+            "<html>" +
+            "<head>" +
+            "    <meta charset=\"UTF-8\">" +
+            "    <style>" +
+            "        body { font-family: Arial, sans-serif; background-color: #f5f5f5; margin: 0; padding: 20px; }" +
+            "        .container { max-width: 600px; margin: 0 auto; background-color: white; border-radius: 10px; padding: 40px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }" +
+            "        .header { text-align: center; margin-bottom: 30px; }" +
+            "        .header h1 { color: #4a6cf7; margin: 0; }" +
+            "        .content { margin-bottom: 30px; }" +
+            "        .credentials { background-color: #e8f4f8; border-left: 4px solid #4a6cf7; padding: 15px; margin: 15px 0; }" +
+            "        .credentials p { margin: 8px 0; }" +
+            "        .credentials strong { color: #333; }" +
+            "        .warning { background-color: #fff3cd; border: 1px solid #ffc107; padding: 15px; border-radius: 5px; margin: 15px 0; color: #856404; }" +
+            "        .button { display: inline-block; background-color: #4a6cf7; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; }" +
+            "        .footer { text-align: center; color: #666; font-size: 12px; margin-top: 30px; }" +
+            "    </style>" +
+            "</head>" +
+            "<body>" +
+            "    <div class=\"container\">" +
+            "        <div class=\"header\">" +
+            "            <h1>Welcome to PossApp!</h1>" +
+            "        </div>" +
+            "        <div class=\"content\">" +
+            "            <h2>Hello %s,</h2>" +
+            "            <p>An admin has created an account for you. Here are your login details:</p>" +
+            "            <div class=\"credentials\">" +
+            "                <p><strong>Email:</strong> %s</p>" +
+            "                <p><strong>Password:</strong> %s</p>" +
+            "                <p><strong>Business ID:</strong> %s</p>" +
+            "            </div>" +
+            "            <div class=\"warning\">" +
+            "                <strong>⚠️ Important:</strong> You will be required to change your password when you first log in for security reasons." +
+            "            </div>" +
+            "            <center><a href=\"%s\" class=\"button\">Login to PossApp</a></center>" +
+            "            <p>Or copy and paste this URL into your browser:</p>" +
+            "            <div style=\"background-color: #f8f9fa; padding: 10px; border-radius: 5px; word-break: break-all;\">%s</div>" +
+            "        </div>" +
+            "        <div class=\"footer\">" +
+            "            <p>If you have any questions, please contact your administrator.</p>" +
+            "            <p>&copy; 2025 PossApp. All rights reserved.</p>" +
+            "        </div>" +
+            "    </div>" +
+            "</body>" +
+            "</html>",
+            name, email, password, tenantId, loginUrl, loginUrl
+        );
+    }
 }
