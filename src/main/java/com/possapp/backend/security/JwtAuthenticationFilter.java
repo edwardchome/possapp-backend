@@ -31,6 +31,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, 
                                      FilterChain filterChain) throws ServletException, IOException {
         String currentTenant = TenantContext.getCurrentTenant();
+        String requestUri = request.getRequestURI();
+        
+        log.info("[JWT FILTER] Request: {} | TenantContext: {}", requestUri, currentTenant);
         
         try {
             String jwt = getJwtFromRequest(request);
@@ -54,8 +57,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     return;
                 }
                 
+                log.info("[JWT FILTER] Comparing - Token tenant: '{}' | Context tenant: '{}'", tokenTenantId, currentTenant);
+                
                 if (currentTenant == null || !currentTenant.equals(tokenTenantId)) {
-                    log.error("TENANT MISMATCH: Token tenant={}, Request tenant={}", tokenTenantId, currentTenant);
+                    log.error("[JWT FILTER] TENANT MISMATCH: Token tenant='{}' | Context tenant='{}'", tokenTenantId, currentTenant);
                     response.setStatus(HttpServletResponse.SC_FORBIDDEN);
                     response.getWriter().write("{\"error\":\"Cross-tenant access denied\"}");
                     return;

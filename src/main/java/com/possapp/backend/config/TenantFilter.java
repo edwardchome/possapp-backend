@@ -17,12 +17,6 @@ public class TenantFilter implements Filter {
     
     private static final String TENANT_HEADER = "X-Tenant-ID";
     
-    // Paths that don't require authentication but still need tenant context
-    private static final List<String> AUTH_PATHS = Arrays.asList(
-        "/api/v1/auth/login",
-        "/api/v1/auth/register"
-    );
-    
     // Paths that are completely public and don't need tenant context
     private static final List<String> PUBLIC_PATHS = Arrays.asList(
         "/api/v1/tenants/register",
@@ -46,8 +40,16 @@ public class TenantFilter implements Filter {
         HttpServletRequest httpRequest = (HttpServletRequest) request;
         HttpServletResponse httpResponse = (HttpServletResponse) response;
         String requestUri = httpRequest.getRequestURI();
+        String method = httpRequest.getMethod();
         
-        // Skip tenant validation for completely public paths (tenant registration, health, etc.)
+        // Allow CORS preflight (OPTIONS) requests to pass through
+        if ("OPTIONS".equalsIgnoreCase(method)) {
+            log.debug("Allowing CORS preflight request: {} {}", method, requestUri);
+            chain.doFilter(request, response);
+            return;
+        }
+        
+        // Skip tenant validation for completely public paths
         if (isPublicPath(requestUri)) {
             chain.doFilter(request, response);
             return;
@@ -55,9 +57,21 @@ public class TenantFilter implements Filter {
         
         String tenantId = httpRequest.getHeader(TENANT_HEADER);
         
+        // Debug: Log all headers
+        if (log.isDebugEnabled()) {
+            log.debug("Request: {} {}", method, requestUri);
+            log.debug("Tenant header value: {}", tenantId);
+            java.util.Enumeration<String> headerNames = httpRequest.getHeaderNames();
+            while (headerNames.hasMoreElements()) {
+                String headerName = headerNames.nextElement();
+                log.debug("Header: {} = {}", headerName, httpRequest.getHeader(headerName));
+            }
+        }
+        
         if (tenantId == null || tenantId.isBlank()) {
-            log.warn("Missing tenant header for request: {}", requestUri);
+            log.warn("Missing tenant header for request: {} {}", method, requestUri);
             httpResponse.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+            httpResponse.setContentType("application/json");
             httpResponse.getWriter().write("{\"error\":\"Missing X-Tenant-ID header\"}");
             return;
         }
@@ -73,6 +87,7 @@ public class TenantFilter implements Filter {
             if (!tenant.isActive()) {
                 log.warn("Tenant {} is not active", tenantId);
                 httpResponse.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                httpResponse.setContentType("application/json");
                 httpResponse.getWriter().write("{\"error\":\"Tenant is not active\"}");
                 return;
             }
@@ -86,6 +101,7 @@ public class TenantFilter implements Filter {
         } catch (IllegalArgumentException e) {
             log.warn("Invalid tenant: {}", tenantId);
             httpResponse.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            httpResponse.setContentType("application/json");
             httpResponse.getWriter().write("{\"error\":\"Invalid tenant\"}");
         } finally {
             log.debug("Clearing tenant context for request: {}", requestUri);

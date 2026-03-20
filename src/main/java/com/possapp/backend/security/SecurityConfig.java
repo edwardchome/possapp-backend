@@ -1,10 +1,10 @@
 package com.possapp.backend.security;
 
-import com.possapp.backend.security.JwtTokenProvider;
+import com.possapp.backend.config.TenantFilter;
+import com.possapp.backend.service.TenantService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
@@ -34,6 +34,7 @@ public class SecurityConfig {
     private final UserDetailsService userDetailsService;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
+    private final TenantService tenantService;
     
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -48,25 +49,41 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/tenants/register").permitAll()
                 .requestMatchers("/actuator/health", "/actuator/info").permitAll()
                 .requestMatchers("/error").permitAll()
-                // Swagger/OpenAPI (if added later)
+                // Swagger/OpenAPI
                 .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
                 // All other endpoints require authentication
                 .anyRequest().authenticated()
             )
             .authenticationProvider(authenticationProvider())
-            // Add JWT filter (TenantFilter is registered separately via FilterRegistrationBean)
-            .addFilterBefore(jwtAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class);
+            // Add TenantFilter FIRST (before JWT filter) to set tenant context
+            .addFilterBefore(tenantFilter(), UsernamePasswordAuthenticationFilter.class)
+            // Add JWT filter after TenantFilter
+            .addFilterAfter(jwtAuthenticationFilter(), TenantFilter.class);
         
         return http.build();
     }
     
     @Bean
+    public TenantFilter tenantFilter() {
+        return new TenantFilter(tenantService);
+    }
+    
+    @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of("*")); // In production, specify actual origins
+        // Allow all origins - use allowedOriginPatterns when allowing credentials
+        configuration.setAllowedOriginPatterns(List.of("*"));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
-        configuration.setAllowedHeaders(Arrays.asList("*"));
+        configuration.setAllowedHeaders(Arrays.asList(
+            "Authorization",
+            "Content-Type",
+            "X-Tenant-ID",
+            "Accept",
+            "Origin",
+            "X-Requested-With"
+        ));
         configuration.setExposedHeaders(Arrays.asList("Authorization", "X-Tenant-ID"));
+        configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
         
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
