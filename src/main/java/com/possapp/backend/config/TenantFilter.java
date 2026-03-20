@@ -7,6 +7,7 @@ import jakarta.servlet.*;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.web.context.request.RequestContextListener;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -20,6 +21,11 @@ public class TenantFilter implements Filter {
     // Paths that are completely public and don't need tenant context
     private static final List<String> PUBLIC_PATHS = Arrays.asList(
         "/api/v1/tenants/register",
+        "/api/v1/auth/register/initiate",
+        "/api/v1/auth/register/complete",
+        "/api/v1/auth/verify-email",
+        "/api/v1/auth/resend-verification",
+        "/api/v1/auth/registration-status",
         "/actuator/health",
         "/actuator/info",
         "/error",
@@ -94,17 +100,22 @@ public class TenantFilter implements Filter {
             
             // Now set the actual tenant context for this request
             TenantContext.setCurrentTenant(tenantId);
-            log.debug("Tenant context set to: {} for request: {}", tenantId, requestUri);
+            log.info("Tenant context set to: {} for request: {} {}", tenantId, method, requestUri);
             
-            chain.doFilter(request, response);
+            try {
+                chain.doFilter(request, response);
+            } finally {
+                // Clear tenant context after the ENTIRE request is complete
+                // This ensures Spring Security authentication can access the tenant
+                log.debug("Clearing tenant context for request: {}", requestUri);
+                TenantContext.clear();
+            }
             
         } catch (IllegalArgumentException e) {
             log.warn("Invalid tenant: {}", tenantId);
             httpResponse.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             httpResponse.setContentType("application/json");
             httpResponse.getWriter().write("{\"error\":\"Invalid tenant\"}");
-        } finally {
-            log.debug("Clearing tenant context for request: {}", requestUri);
             TenantContext.clear();
         }
     }

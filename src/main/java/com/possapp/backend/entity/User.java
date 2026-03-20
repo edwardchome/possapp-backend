@@ -47,6 +47,12 @@ public class User {
     @Builder.Default
     private boolean emailVerified = false;
     
+    @Column(name = "email_verification_token")
+    private String emailVerificationToken;
+    
+    @Column(name = "email_verification_expiry")
+    private LocalDateTime emailVerificationExpiry;
+    
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -63,5 +69,12 @@ public class User {
         return String.format("%s %s", 
             firstName != null ? firstName : "", 
             lastName != null ? lastName : "").trim();
+    }
+    
+    public boolean isEmailVerificationTokenValid() {
+        if (emailVerificationToken == null || emailVerificationExpiry == null) {
+            return false;
+        }
+        return LocalDateTime.now().isBefore(emailVerificationExpiry);
     }
 }

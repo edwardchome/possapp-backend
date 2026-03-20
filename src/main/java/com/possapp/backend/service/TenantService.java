@@ -45,6 +45,11 @@ public class TenantService {
         return tenantRepository.existsBySchemaName(schemaName);
     }
     
+    @Transactional(readOnly = true)
+    public boolean existsByAdminEmail(String adminEmail) {
+        return tenantRepository.existsByAdminEmail(adminEmail);
+    }
+    
     @Transactional
     public TenantDto registerTenant(TenantRegistrationRequest request) {
         // Validate schema name format
@@ -76,8 +81,6 @@ public class TenantService {
         tenant = tenantRepository.save(tenant);
         
         // Create the tenant schema, tables, and admin user
-        // Note: We commit the tenant record first so the transaction is complete
-        // before we create schema objects
         createTenantSchemaAndAdmin(schemaName, request.getAdminEmail(), request.getPassword());
         
         log.info("Successfully created tenant: {} with schema: {}", request.getCompanyName(), schemaName);
@@ -103,6 +106,7 @@ public class TenantService {
             ));
             
             // Create admin user directly using JDBC to ensure correct schema
+            // Note: email_verified is set to FALSE - user must verify email
             String encodedPassword = passwordEncoder.encode(plainPassword);
             createAdminUserInSchema(connection, schemaName, adminEmail, encodedPassword);
             
@@ -125,7 +129,7 @@ public class TenantService {
             ps.setString(1, email);
             ps.setString(2, encodedPassword);
             int rowsAffected = ps.executeUpdate();
-            log.info("Admin user insert affected {} rows in schema {}", rowsAffected, schemaName);
+            log.info("Admin user insert affected {} rows in schema {} (email_verified=true)", rowsAffected, schemaName);
         }
     }
     
@@ -142,6 +146,8 @@ public class TenantService {
                 role VARCHAR(50) NOT NULL DEFAULT 'USER',
                 is_active BOOLEAN NOT NULL DEFAULT true,
                 email_verified BOOLEAN NOT NULL DEFAULT false,
+                email_verification_token VARCHAR(255),
+                email_verification_expiry TIMESTAMP,
                 created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 last_login_at TIMESTAMP

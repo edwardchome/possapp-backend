@@ -5,6 +5,7 @@ import com.possapp.backend.dto.AuthRequest;
 import com.possapp.backend.dto.AuthResponse;
 import com.possapp.backend.dto.UserDto;
 import com.possapp.backend.security.JwtTokenProvider;
+import com.possapp.backend.service.EmailVerificationService;
 import com.possapp.backend.service.UserService;
 import com.possapp.backend.tenant.TenantContext;
 import io.swagger.v3.oas.annotations.Operation;
@@ -40,16 +41,18 @@ public class AuthController {
     private final JwtTokenProvider jwtTokenProvider;
     private final UserService userService;
     private final PasswordEncoder passwordEncoder;
+    private final EmailVerificationService emailVerificationService;
     
     @PostMapping("/login")
     @Operation(
         summary = "Login",
-        description = "Authenticate user and return JWT token. Requires X-Tenant-ID header for tenant context."
+        description = "Authenticate user and return JWT token. Requires X-Tenant-ID header for tenant context. Email verification is required."
     )
     @ApiResponses(value = {
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Login successful", 
             content = @Content(schema = @Schema(implementation = ApiResponse.class))),
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Invalid credentials"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Email not verified"),
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Invalid request")
     })
     public ResponseEntity<ApiResponse<AuthResponse>> login(
@@ -69,6 +72,13 @@ public class AuthController {
             log.error("No tenant context found during login for user: {}", request.getEmail());
             return ResponseEntity.status(400)
                 .body(ApiResponse.<AuthResponse>error("Tenant context required"));
+        }
+        
+        // Check if email is verified
+        if (!emailVerificationService.isEmailVerified(request.getEmail(), tenantId)) {
+            log.warn("Login attempt for unverified email: {}", request.getEmail());
+            return ResponseEntity.status(403)
+                .body(ApiResponse.<AuthResponse>error("Email not verified. Please check your email and verify your account."));
         }
         
         String token = jwtTokenProvider.generateToken(authentication, tenantId);

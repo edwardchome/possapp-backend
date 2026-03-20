@@ -4,6 +4,7 @@ import com.possapp.backend.dto.UserDto;
 import com.possapp.backend.entity.User;
 import com.possapp.backend.exception.UserException;
 import com.possapp.backend.repository.UserRepository;
+import com.possapp.backend.tenant.TenantContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
@@ -27,8 +28,14 @@ public class UserService implements UserDetailsService {
     @Override
     @Transactional(readOnly = true)
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
+        String currentTenant = TenantContext.getCurrentTenant();
+        log.info("Loading user by username: {} in tenant: {}", email, currentTenant);
+        
         User user = userRepository.findByEmailAndActiveTrue(email)
-            .orElseThrow(() -> new UsernameNotFoundException("User not found: " + email));
+            .orElseThrow(() -> {
+                log.error("User not found: {} in tenant: {}", email, currentTenant);
+                return new UsernameNotFoundException("User not found: " + email);
+            });
         
         return org.springframework.security.core.userdetails.User.builder()
             .username(user.getEmail())

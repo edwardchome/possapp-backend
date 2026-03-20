@@ -42,6 +42,20 @@ spring:
     schemas: public
     create-schemas: true
 
+  # Email Configuration
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: poswizapp@gmail.com
+    password: cyywghsdxjyopwtd
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+        debug: false
+
 # JWT Configuration
 jwt:
   secret: ${JWT_SECRET:JhuMKnBHz/rKSx3cxn20KuCvWJUlxHI/nE3l50yklAWfBkL2N9UavxnJwy4ETHL+Wo2Fl+adVHdTvrOXzv9tyg==}
@@ -69,6 +83,16 @@ springdoc:
     tagsSorter: alpha
     filter: true
   show-actuator: true
+
+
+
+# App Configuration
+app:
+  frontend:
+    url: ${FRONTEND_URL:http://localhost:3000}
+  email:
+    verification:
+      expiry-seconds: 40
 
 # Management
 management:
