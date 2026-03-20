@@ -5,6 +5,7 @@ import com.possapp.backend.dto.AuthRequest;
 import com.possapp.backend.dto.AuthResponse;
 import com.possapp.backend.dto.UserDto;
 import com.possapp.backend.security.JwtTokenProvider;
+import com.possapp.backend.service.EmailService;
 import com.possapp.backend.service.EmailVerificationService;
 import com.possapp.backend.service.UserService;
 import com.possapp.backend.tenant.TenantContext;
@@ -42,6 +43,7 @@ public class AuthController {
     private final UserService userService;
     private final PasswordEncoder passwordEncoder;
     private final EmailVerificationService emailVerificationService;
+    private final EmailService emailService;
     
     @PostMapping("/login")
     @Operation(
@@ -288,5 +290,78 @@ public class AuthController {
         
         userService.changePassword(currentUser.getEmail(), currentPassword, newPassword);
         return ResponseEntity.ok(ApiResponse.success("Password changed successfully", null));
+    }
+    
+    @PostMapping("/forgot-password")
+    @Operation(
+        summary = "Request password reset",
+        description = "Send password reset email to user"
+    )
+    public ResponseEntity<ApiResponse<Void>> forgotPassword(
+            @Parameter(description = "Email address", required = true)
+            @RequestBody Map<String, String> request) {
+        String email = request.get("email");
+        if (email == null || email.isEmpty()) {
+            return ResponseEntity.badRequest()
+                .body(ApiResponse.error("Email is required"));
+        }
+        
+        try {
+            // Generate token and send email
+            String token = userService.generatePasswordResetToken(email);
+            UserDto user = userService.getUserProfile(email);
+            emailService.sendPasswordResetEmail(email, token, user.getFirstName());
+            
+            return ResponseEntity.ok(ApiResponse.success(
+                "Password reset email sent. Please check your inbox.", null));
+        } catch (Exception e) {
+            // Don't reveal if email exists for security
+            log.warn("Password reset request failed for: {}", email);
+            return ResponseEntity.ok(ApiResponse.success(
+                "If an account exists with this email, you will receive a password reset link.", null));
+        }
+    }
+    
+    @GetMapping("/reset-password/validate")
+    @Operation(
+        summary = "Validate password reset token",
+        description = "Check if a password reset token is valid"
+    )
+    public ResponseEntity<ApiResponse<Boolean>> validateResetToken(
+            @Parameter(description = "Reset token", required = true)
+            @RequestParam String token) {
+        boolean isValid = userService.isPasswordResetTokenValid(token);
+        return ResponseEntity.ok(ApiResponse.success(isValid));
+    }
+    
+    @PostMapping("/reset-password")
+    @Operation(
+        summary = "Reset password",
+        description = "Reset password using token from email"
+    )
+    public ResponseEntity<ApiResponse<Void>> resetPassword(
+            @Parameter(description = "Reset request", required = true)
+            @RequestBody Map<String, String> request) {
+        String token = request.get("token");
+        String newPassword = request.get("newPassword");
+        
+        if (token == null || newPassword == null) {
+            return ResponseEntity.badRequest()
+                .body(ApiResponse.error("Token and new password are required"));
+        }
+        
+        if (newPassword.length() < 6) {
+            return ResponseEntity.badRequest()
+                .body(ApiResponse.error("Password must be at least 6 characters"));
+        }
+        
+        try {
+            userService.resetPassword(token, newPassword);
+            return ResponseEntity.ok(ApiResponse.success(
+                "Password reset successful. Please login with your new password.", null));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest()
+                .body(ApiResponse.error(e.getMessage()));
+        }
     }
 }

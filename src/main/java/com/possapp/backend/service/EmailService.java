@@ -258,4 +258,58 @@ public class EmailService {
             name, email, password, tenantId, loginUrl, loginUrl
         );
     }
+    
+    public void sendPasswordResetEmail(String toEmail, String resetToken, String firstName) {
+        String subject = "Reset Your PossApp Password";
+        String baseUrl = System.getenv("APP_BASE_URL");
+        if (baseUrl == null || baseUrl.isEmpty()) {
+            baseUrl = "http://localhost:8080";
+        }
+        String resetUrl = baseUrl + "/reset-password?token=" + resetToken;
+        String name = firstName != null && !firstName.isEmpty() ? firstName : toEmail;
+        
+        String htmlBody = String.format(
+            "<!DOCTYPE html>" +
+            "<html>" +
+            "<head>" +
+            "    <meta charset=\"UTF-8\">" +
+            "    <style>" +
+            "        body { font-family: Arial, sans-serif; background-color: #f5f5f5; margin: 0; padding: 20px; }" +
+            "        .container { max-width: 600px; margin: 0 auto; background-color: white; border-radius: 10px; padding: 40px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }" +
+            "        .header { text-align: center; margin-bottom: 30px; }" +
+            "        .header h1 { color: #4a6cf7; margin: 0; }" +
+            "        .content { margin-bottom: 30px; }" +
+            "        .button { display: inline-block; background-color: #4a6cf7; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; }" +
+            "        .warning { background-color: #fff3cd; border: 1px solid #ffc107; padding: 15px; border-radius: 5px; margin: 15px 0; color: #856404; }" +
+            "        .footer { text-align: center; color: #666; font-size: 12px; margin-top: 30px; }" +
+            "    </style>" +
+            "</head>" +
+            "<body>" +
+            "    <div class=\"container\">" +
+            "        <div class=\"header\">" +
+            "            <h1>Password Reset Request</h1>" +
+            "        </div>" +
+            "        <div class=\"content\">" +
+            "            <h2>Hello %s,</h2>" +
+            "            <p>We received a request to reset your PossApp password. Click the button below to reset your password:</p>" +
+            "            <center><a href=\"%s\" class=\"button\">Reset Password</a></center>" +
+            "            <p>Or copy and paste this link into your browser:</p>" +
+            "            <div style=\"background-color: #f8f9fa; padding: 10px; border-radius: 5px; word-break: break-all;\">%s</div>" +
+            "            <div class=\"warning\">" +
+            "                <strong>⚠️ Important:</strong> This link will expire in 1 hour for security reasons." +
+            "            </div>" +
+            "            <p>If you didn't request this password reset, please ignore this email. Your password will remain unchanged.</p>" +
+            "        </div>" +
+            "        <div class=\"footer\">" +
+            "            <p>If you have any questions, please contact your administrator.</p>" +
+            "            <p>&copy; 2025 PossApp. All rights reserved.</p>" +
+            "        </div>" +
+            "    </div>" +
+            "</body>" +
+            "</html>",
+            name, resetUrl, resetUrl
+        );
+        
+        sendHtmlEmail(toEmail, subject, htmlBody);
+    }
 }

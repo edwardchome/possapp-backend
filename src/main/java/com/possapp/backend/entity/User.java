@@ -57,6 +57,12 @@ public class User {
     @Builder.Default
     private boolean passwordChangeRequired = false;
     
+    @Column(name = "password_reset_token")
+    private String passwordResetToken;
+    
+    @Column(name = "password_reset_expiry")
+    private LocalDateTime passwordResetExpiry;
+    
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -80,5 +86,12 @@ public class User {
             return false;
         }
         return LocalDateTime.now().isBefore(emailVerificationExpiry);
+    }
+    
+    public boolean isPasswordResetTokenValid() {
+        if (passwordResetToken == null || passwordResetExpiry == null) {
+            return false;
+        }
+        return LocalDateTime.now().isBefore(passwordResetExpiry);
     }
 }

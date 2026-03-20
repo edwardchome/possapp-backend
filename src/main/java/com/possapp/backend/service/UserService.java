@@ -154,6 +154,48 @@ public class UserService implements UserDetailsService {
         userRepository.save(user);
     }
     
+    @Transactional
+    public String generatePasswordResetToken(String email) {
+        User user = userRepository.findByEmail(email)
+            .orElseThrow(() -> new UserException("User not found"));
+        
+        // Generate random token
+        String token = java.util.UUID.randomUUID().toString();
+        
+        // Set token expiry (1 hour)
+        user.setPasswordResetToken(token);
+        user.setPasswordResetExpiry(LocalDateTime.now().plusHours(1));
+        userRepository.save(user);
+        
+        return token;
+    }
+    
+    @Transactional
+    public void resetPassword(String token, String newPassword) {
+        User user = userRepository.findAll().stream()
+            .filter(u -> token.equals(u.getPasswordResetToken()))
+            .findFirst()
+            .orElseThrow(() -> new UserException("Invalid or expired token"));
+        
+        if (!user.isPasswordResetTokenValid()) {
+            throw new UserException("Token has expired");
+        }
+        
+        // Update password and clear token
+        user.setPassword(passwordEncoder.encode(newPassword));
+        user.setPasswordResetToken(null);
+        user.setPasswordResetExpiry(null);
+        user.setPasswordChangeRequired(false);
+        userRepository.save(user);
+    }
+    
+    @Transactional(readOnly = true)
+    public boolean isPasswordResetTokenValid(String token) {
+        return userRepository.findAll().stream()
+            .filter(u -> token.equals(u.getPasswordResetToken()))
+            .anyMatch(User::isPasswordResetTokenValid);
+    }
+    
     public UserDto mapToDto(User user) {
         return UserDto.builder()
             .id(user.getId())

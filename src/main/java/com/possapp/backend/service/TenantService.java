@@ -149,6 +149,8 @@ public class TenantService {
                 email_verification_token VARCHAR(255),
                 email_verification_expiry TIMESTAMP,
                 password_change_required BOOLEAN NOT NULL DEFAULT false,
+                password_reset_token VARCHAR(255),
+                password_reset_expiry TIMESTAMP,
                 created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 last_login_at TIMESTAMP
