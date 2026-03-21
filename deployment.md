@@ -171,12 +171,24 @@ curl -i https://inventory.com/api/
 
 8) Deploy updates (new jar) safely
 
+Build the JAR (on your Mac or on the server)
+
+From your project folder:
+```
+mvn -U clean package -DskipTests
+ls -lah target/*.jar
+```
+
 From your Mac: copy jar to your server
 ```
 scp  target/*.jar myuser@inventory-app.net.tr:/tmp/app.jar
 ```
 
 When you upload a new jar to /tmp/app.jar:
+
+```
+ssh myuser@inventory-app.net.tr
+```
 ```
 sudo systemctl stop inventory
 sudo mv /opt/inventory-app/app.jar /opt/inventory-app/app.jar.bak.$(date +%F-%H%M)
@@ -185,6 +197,7 @@ sudo chown myuser:myuser /opt/inventory-app/app.jar
 sudo systemctl start inventory
 sudo systemctl status inventory --no-pager
 tail -n 100 /opt/inventory-app/logs/error.log
+tail -n 100 /opt/inventory-app/logs/app.log
 ```
 
 ⸻
