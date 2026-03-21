@@ -379,13 +379,21 @@ public class AuthController {
     @GetMapping("/reset-password/validate")
     @Operation(
         summary = "Validate password reset token",
-        description = "Check if a password reset token is valid"
+        description = "Check if a password reset token is valid. Requires tenantId parameter."
     )
     public ResponseEntity<ApiResponse<Boolean>> validateResetToken(
             @Parameter(description = "Reset token", required = true)
-            @RequestParam String token) {
-        boolean isValid = userService.isPasswordResetTokenValid(token);
-        return ResponseEntity.ok(ApiResponse.success(isValid));
+            @RequestParam String token,
+            @Parameter(description = "Tenant ID", required = true)
+            @RequestParam String tenantId) {
+        try {
+            // Set tenant context for validation
+            TenantContext.setCurrentTenant(tenantId);
+            boolean isValid = userService.isPasswordResetTokenValid(token);
+            return ResponseEntity.ok(ApiResponse.success(isValid));
+        } finally {
+            TenantContext.clear();
+        }
     }
     
     @PostMapping("/reset-password")
