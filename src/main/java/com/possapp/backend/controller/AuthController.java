@@ -295,22 +295,32 @@ public class AuthController {
     @PostMapping("/forgot-password")
     @Operation(
         summary = "Request password reset",
-        description = "Send password reset email to user"
+        description = "Send password reset email to user. Requires tenantId in request body."
     )
     public ResponseEntity<ApiResponse<Void>> forgotPassword(
-            @Parameter(description = "Email address", required = true)
+            @Parameter(description = "Email address and tenantId", required = true)
             @RequestBody Map<String, String> request) {
         String email = request.get("email");
+        String tenantId = request.get("tenantId");
+        
         if (email == null || email.isEmpty()) {
             return ResponseEntity.badRequest()
                 .body(ApiResponse.error("Email is required"));
         }
         
+        if (tenantId == null || tenantId.isEmpty()) {
+            return ResponseEntity.badRequest()
+                .body(ApiResponse.error("Tenant ID is required"));
+        }
+        
         try {
+            // Set tenant context for this request
+            TenantContext.setCurrentTenant(tenantId);
+            
             // Generate token and send email
             String token = userService.generatePasswordResetToken(email);
             UserDto user = userService.getUserProfile(email);
-            emailService.sendPasswordResetEmail(email, token, user.getFirstName());
+            emailService.sendPasswordResetEmail(email, token, user.getFirstName(), tenantId);
             
             return ResponseEntity.ok(ApiResponse.success(
                 "Password reset email sent. Please check your inbox.", null));
@@ -319,7 +329,51 @@ public class AuthController {
             log.warn("Password reset request failed for: {}", email);
             return ResponseEntity.ok(ApiResponse.success(
                 "If an account exists with this email, you will receive a password reset link.", null));
+        } finally {
+            TenantContext.clear();
         }
+    }
+    
+    @GetMapping("/reset-password")
+    @Operation(
+        summary = "Password reset page",
+        description = "Returns instructions for password reset (for browser access)"
+    )
+    public ResponseEntity<String> resetPasswordPage(
+            @Parameter(description = "Reset token", required = true)
+            @RequestParam String token,
+            @Parameter(description = "Tenant ID", required = true)
+            @RequestParam String tenantId) {
+        // Return HTML page with instructions to open the mobile app
+        String html = """
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Reset Password - PossApp</title>
+                <style>
+                    body { font-family: Arial, sans-serif; background: #f5f5f5; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+                    .container { background: white; padding: 40px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); text-align: center; max-width: 400px; }
+                    h1 { color: #4a6cf7; margin-bottom: 20px; }
+                    p { color: #666; line-height: 1.6; margin-bottom: 20px; }
+                    .button { display: inline-block; background: #4a6cf7; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; margin: 10px; }
+                    .note { font-size: 12px; color: #999; margin-top: 20px; }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <h1>🔐 Reset Password</h1>
+                    <p>To reset your password, please open this link in the <strong>PossApp</strong> mobile application.</p>
+                    <p>Token: <code>%s</code></p>
+                    <p>Tenant: <code>%s</code></p>
+                    <a href="possapp://reset-password?token=%s&tenantId=%s" class="button">Open in App</a>
+                    <p class="note">If the button doesn't work, copy the token and enter it manually in the app's password reset screen.</p>
+                </div>
+            </body>
+            </html>
+            """.formatted(token, tenantId, token, tenantId);
+        return ResponseEntity.ok().contentType(org.springframework.http.MediaType.TEXT_HTML).body(html);
     }
     
     @GetMapping("/reset-password/validate")

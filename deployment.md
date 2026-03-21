@@ -171,6 +171,11 @@ curl -i https://inventory.com/api/
 
 8) Deploy updates (new jar) safely
 
+From your Mac: copy jar to your server
+```
+scp  target/*.jar myuser@inventory-app.net.tr:/tmp/app.jar
+```
+
 When you upload a new jar to /tmp/app.jar:
 ```
 sudo systemctl stop inventory

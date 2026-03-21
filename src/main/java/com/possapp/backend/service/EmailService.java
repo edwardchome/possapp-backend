@@ -259,13 +259,14 @@ public class EmailService {
         );
     }
     
-    public void sendPasswordResetEmail(String toEmail, String resetToken, String firstName) {
+    public void sendPasswordResetEmail(String toEmail, String resetToken, String firstName, String tenantId) {
         String subject = "Reset Your PossApp Password";
         String baseUrl = System.getenv("APP_BASE_URL");
         if (baseUrl == null || baseUrl.isEmpty()) {
             baseUrl = "http://localhost:8080";
         }
-        String resetUrl = baseUrl + "/reset-password?token=" + resetToken;
+        // Include tenant ID in reset URL so app can extract it
+        String resetUrl = baseUrl + "/api/v1/auth/reset-password?token=" + resetToken + "&tenantId=" + tenantId;
         String name = firstName != null && !firstName.isEmpty() ? firstName : toEmail;
         
         String htmlBody = String.format(
