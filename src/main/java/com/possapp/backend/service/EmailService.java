@@ -108,7 +108,7 @@ public class EmailService {
             "        <div class=\"content\">" +
             "            <h2>Verify your email address</h2>" +
             "            <p>Thank you for creating an account. Please click the button below to verify your email address:</p>" +
-            "            <center><a href=\"%s\" class=\"button\">Verify Email</a></center>" +
+            "            <center><a href=\"%s\" class=\"button\" style=\"color: #ffffff !important;\">Verify Email & Continue</a></center>" +
             "            <p>Or copy and paste this link into your browser:</p>" +
             "            <div class=\"info\">%s</div>" +
             "            <p><strong>Business ID:</strong> %s</p>" +
