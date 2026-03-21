@@ -172,8 +172,14 @@ public class UserService implements UserDetailsService {
     
     @Transactional
     public void resetPassword(String token, String newPassword) {
+        // Find user by token (exact match or token starts with provided code)
         User user = userRepository.findAll().stream()
-            .filter(u -> token.equals(u.getPasswordResetToken()))
+            .filter(u -> {
+                String storedToken = u.getPasswordResetToken();
+                if (storedToken == null) return false;
+                // Allow exact match OR stored token starts with provided token (for short code)
+                return token.equals(storedToken) || storedToken.startsWith(token);
+            })
             .findFirst()
             .orElseThrow(() -> new UserException("Invalid or expired token"));
         
@@ -192,7 +198,12 @@ public class UserService implements UserDetailsService {
     @Transactional(readOnly = true)
     public boolean isPasswordResetTokenValid(String token) {
         return userRepository.findAll().stream()
-            .filter(u -> token.equals(u.getPasswordResetToken()))
+            .filter(u -> {
+                String storedToken = u.getPasswordResetToken();
+                if (storedToken == null) return false;
+                // Allow exact match OR stored token starts with provided token (for short code)
+                return token.equals(storedToken) || storedToken.startsWith(token);
+            })
             .anyMatch(User::isPasswordResetTokenValid);
     }
     

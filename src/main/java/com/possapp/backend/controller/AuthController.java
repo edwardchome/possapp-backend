@@ -399,13 +399,14 @@ public class AuthController {
     @PostMapping("/reset-password")
     @Operation(
         summary = "Reset password",
-        description = "Reset password using token from email"
+        description = "Reset password using token from email. Token can be short code or full UUID."
     )
     public ResponseEntity<ApiResponse<Void>> resetPassword(
             @Parameter(description = "Reset request", required = true)
             @RequestBody Map<String, String> request) {
         String token = request.get("token");
         String newPassword = request.get("newPassword");
+        String tenantId = request.get("tenantId");
         
         if (token == null || newPassword == null) {
             return ResponseEntity.badRequest()
@@ -418,12 +419,19 @@ public class AuthController {
         }
         
         try {
+            // Set tenant context if provided
+            if (tenantId != null && !tenantId.isEmpty()) {
+                TenantContext.setCurrentTenant(tenantId);
+            }
+            
             userService.resetPassword(token, newPassword);
             return ResponseEntity.ok(ApiResponse.success(
                 "Password reset successful. Please login with your new password.", null));
         } catch (Exception e) {
             return ResponseEntity.badRequest()
                 .body(ApiResponse.error(e.getMessage()));
+        } finally {
+            TenantContext.clear();
         }
     }
 }
