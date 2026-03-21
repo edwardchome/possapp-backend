@@ -108,7 +108,7 @@ public class EmailService {
             "        <div class=\"content\">" +
             "            <h2>Verify your email address</h2>" +
             "            <p>Thank you for creating an account. Please click the button below to verify your email address:</p>" +
-            "            <center><table cellspacing=\"0\" cellpadding=\"0\"><tr><td style=\"background-color: #4a6cf7; border-radius: 5px; text-align: center;\"><a href=\"%s\" style=\"display: inline-block; color: #ffffff !important; font-weight: bold; text-decoration: none; padding: 15px 30px; -webkit-text-fill-color: #ffffff !important;\">Verify Email & Continue</a></td></tr></table></center>" +
+            "            <center><a href=\"%s\" style=\"background-color: #4a6cf7; border: 12px solid #4a6cf7; border-radius: 5px; color: #ffffff !important; display: inline-block; font-family: Arial, sans-serif; font-size: 16px; font-weight: bold; line-height: 1; text-decoration: none; text-align: center; mso-hide: all; padding: 3px 18px;\"><span style=\"color: #ffffff !important; font-family: Arial, sans-serif; font-size: 16px; font-weight: bold; line-height: 1; text-decoration: none; mso-line-height-rule: exactly;\">Verify Email & Continue</span></a></center>" +
             "            <p>Or copy and paste this link into your browser:</p>" +
             "            <div class=\"info\">%s</div>" +
             "            <p><strong>Business ID:</strong> %s</p>" +
