@@ -157,14 +157,32 @@ public class TenantService {
             )
             """, schemaName));
         
-        // Products table
+        // Categories table
+        statement.executeUpdate(String.format("""
+            CREATE TABLE IF NOT EXISTS %s.categories (
+                id VARCHAR(36) PRIMARY KEY DEFAULT gen_random_uuid()::text,
+                name VARCHAR(255) NOT NULL UNIQUE,
+                description TEXT,
+                display_order INTEGER DEFAULT 0,
+                is_active BOOLEAN NOT NULL DEFAULT true,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """, schemaName));
+        
+        // Insert default General category
+        statement.executeUpdate(String.format(
+            "INSERT INTO %s.categories (id, name, description, display_order, is_active) VALUES (gen_random_uuid(), 'General', 'Default category for products', 0, true) ON CONFLICT (name) DO NOTHING",
+            schemaName));
+        
+        // Products table with category reference
         statement.executeUpdate(String.format("""
             CREATE TABLE IF NOT EXISTS %s.products (
                 code VARCHAR(100) PRIMARY KEY,
                 name VARCHAR(255) NOT NULL,
                 price DECIMAL(10, 2) NOT NULL,
                 stock INTEGER NOT NULL DEFAULT 0,
-                category VARCHAR(100) NOT NULL DEFAULT 'General',
+                category_id VARCHAR(36),
                 description TEXT,
                 image_url VARCHAR(500),
                 cost_price DECIMAL(10, 2),
@@ -172,9 +190,10 @@ public class TenantService {
                 is_active BOOLEAN NOT NULL DEFAULT true,
                 created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                created_by VARCHAR(100)
+                created_by VARCHAR(100),
+                FOREIGN KEY (category_id) REFERENCES %s.categories(id)
             )
-            """, schemaName));
+            """, schemaName, schemaName));
         
         // Receipts table
         statement.executeUpdate(String.format("""

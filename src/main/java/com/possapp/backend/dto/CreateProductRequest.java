@@ -25,7 +25,7 @@ public class CreateProductRequest {
     @Min(value = 0, message = "Stock cannot be negative")
     private Integer stock;
     
-    private String category = "General";
+    private String categoryId;
     private String description;
     private String imageUrl;
     

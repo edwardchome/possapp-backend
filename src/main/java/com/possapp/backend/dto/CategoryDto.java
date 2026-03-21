@@ -6,7 +6,6 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Data
@@ -14,20 +13,13 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public class ProductDto {
+public class CategoryDto {
     
-    private String code;
+    private String id;
     private String name;
-    private BigDecimal price;
-    private Integer stock;
-    private String categoryId;
-    private String categoryName;
     private String description;
-    private String imageUrl;
-    private BigDecimal costPrice;
-    private Integer minStockLevel;
+    private Integer displayOrder;
     private boolean active;
-    private boolean lowStock;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

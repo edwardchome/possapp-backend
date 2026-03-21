@@ -2,8 +2,10 @@ package com.possapp.backend.service;
 
 import com.possapp.backend.dto.CreateProductRequest;
 import com.possapp.backend.dto.ProductDto;
+import com.possapp.backend.entity.Category;
 import com.possapp.backend.entity.Product;
 import com.possapp.backend.exception.ProductException;
+import com.possapp.backend.repository.CategoryRepository;
 import com.possapp.backend.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,6 +22,7 @@ import java.util.stream.Collectors;
 public class ProductService {
     
     private final ProductRepository productRepository;
+    private final CategoryRepository categoryRepository;
     
     @Transactional(readOnly = true)
     public List<ProductDto> getAllProducts() {
@@ -49,12 +52,24 @@ public class ProductService {
             throw new ProductException("Product with code already exists: " + request.getCode());
         }
         
+        // Lookup category if provided
+        Category category = null;
+        if (request.getCategoryId() != null && !request.getCategoryId().isEmpty()) {
+            category = categoryRepository.findById(request.getCategoryId())
+                .orElse(null);
+        }
+        // Fallback to default General category if not found
+        if (category == null) {
+            category = categoryRepository.findByName("General")
+                .orElse(null);
+        }
+        
         Product product = Product.builder()
             .code(request.getCode())
             .name(request.getName())
             .price(request.getPrice())
             .stock(request.getStock())
-            .category(request.getCategory())
+            .category(category)
             .description(request.getDescription())
             .imageUrl(request.getImageUrl())
             .costPrice(request.getCostPrice())
@@ -72,10 +87,16 @@ public class ProductService {
         Product product = productRepository.findByCodeAndActiveTrue(code)
             .orElseThrow(() -> new ProductException("Product not found: " + code));
         
+        // Lookup category if provided
+        if (request.getCategoryId() != null && !request.getCategoryId().isEmpty()) {
+            Category category = categoryRepository.findById(request.getCategoryId())
+                .orElseThrow(() -> new ProductException("Category not found: " + request.getCategoryId()));
+            product.setCategory(category);
+        }
+        
         product.setName(request.getName());
         product.setPrice(request.getPrice());
         product.setStock(request.getStock());
-        product.setCategory(request.getCategory());
         product.setDescription(request.getDescription());
         product.setImageUrl(request.getImageUrl());
         product.setCostPrice(request.getCostPrice());
@@ -144,12 +165,11 @@ public class ProductService {
     }
     
     public ProductDto mapToDto(Product product) {
-        return ProductDto.builder()
+        ProductDto.ProductDtoBuilder builder = ProductDto.builder()
             .code(product.getCode())
             .name(product.getName())
             .price(product.getPrice())
             .stock(product.getStock())
-            .category(product.getCategory())
             .description(product.getDescription())
             .imageUrl(product.getImageUrl())
             .costPrice(product.getCostPrice())
@@ -157,7 +177,15 @@ public class ProductService {
             .active(product.isActive())
             .lowStock(product.isLowStock())
             .createdAt(product.getCreatedAt())
-            .updatedAt(product.getUpdatedAt())
-            .build();
+            .updatedAt(product.getUpdatedAt());
+        
+        if (product.getCategory() != null) {
+            builder.categoryId(product.getCategory().getId())
+                   .categoryName(product.getCategory().getName());
+        } else {
+            builder.categoryName("General");
+        }
+        
+        return builder.build();
     }
 }

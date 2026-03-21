@@ -30,9 +30,9 @@ public class Product {
     @Builder.Default
     private Integer stock = 0;
     
-    @Column(nullable = false)
-    @Builder.Default
-    private String category = "General";
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "category_id")
+    private Category category;
     
     @Column(length = 2000)
     private String description;
