@@ -95,7 +95,7 @@ public class EmailService {
             "        .header { text-align: center; margin-bottom: 30px; }" +
             "        .header h1 { color: #4a6cf7; margin: 0; }" +
             "        .content { margin-bottom: 30px; }" +
-            "        .button { display: inline-block; background-color: #4a6cf7; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; }" +
+            "        .button { display: inline-block; background-color: #4a6cf7; color: #ffffff !important; font-weight: bold; padding: 15px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; -webkit-text-fill-color: #ffffff !important; }" +
             "        .info { background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin: 15px 0; word-break: break-all; }" +
             "        .footer { text-align: center; color: #666; font-size: 12px; margin-top: 30px; }" +
             "    </style>" +
@@ -108,7 +108,7 @@ public class EmailService {
             "        <div class=\"content\">" +
             "            <h2>Verify your email address</h2>" +
             "            <p>Thank you for creating an account. Please click the button below to verify your email address:</p>" +
-            "            <center><a href=\"%s\" class=\"button\" style=\"color: #ffffff !important;\">Verify Email & Continue</a></center>" +
+            "            <center><table cellspacing=\"0\" cellpadding=\"0\"><tr><td style=\"background-color: #4a6cf7; border-radius: 5px; text-align: center;\"><a href=\"%s\" style=\"display: inline-block; color: #ffffff !important; font-weight: bold; text-decoration: none; padding: 15px 30px; -webkit-text-fill-color: #ffffff !important;\">Verify Email & Continue</a></td></tr></table></center>" +
             "            <p>Or copy and paste this link into your browser:</p>" +
             "            <div class=\"info\">%s</div>" +
             "            <p><strong>Business ID:</strong> %s</p>" +
