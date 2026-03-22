@@ -157,6 +157,14 @@ public class ProductService {
     }
     
     @Transactional(readOnly = true)
+    public List<ProductDto> getProductsByCategory(String categoryId) {
+        return productRepository.findByCategoryIdAndActiveTrueOrderByNameAsc(categoryId)
+            .stream()
+            .map(this::mapToDto)
+            .collect(Collectors.toList());
+    }
+    
+    @Transactional(readOnly = true)
     public List<ProductDto> getLowStockProducts() {
         return productRepository.findByStockLessThanEqualAndActiveTrue(10)
             .stream()

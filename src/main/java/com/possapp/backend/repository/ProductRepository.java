@@ -1,5 +1,6 @@
 package com.possapp.backend.repository;
 
+import com.possapp.backend.entity.Category;
 import com.possapp.backend.entity.Product;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -16,7 +17,11 @@ public interface ProductRepository extends JpaRepository<Product, String> {
     
     Optional<Product> findByCodeAndActiveTrue(String code);
     
-    List<Product> findByCategoryAndActiveTrueOrderByNameAsc(String category);
+    // Query by category entity - used when you have the Category object
+    List<Product> findByCategoryAndActiveTrueOrderByNameAsc(Category category);
+    
+    // Query by category ID - used when you only have the category ID string
+    List<Product> findByCategoryIdAndActiveTrueOrderByNameAsc(String categoryId);
     
     List<Product> findByStockLessThanEqualAndActiveTrue(Integer threshold);
     
@@ -25,11 +30,12 @@ public interface ProductRepository extends JpaRepository<Product, String> {
     @Query("SELECT p FROM Product p WHERE p.active = true AND " +
            "(LOWER(p.name) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
            "LOWER(p.code) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
-           "LOWER(p.category) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
+           "LOWER(p.category.name) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
            "LOWER(p.description) LIKE LOWER(CONCAT('%', :query, '%')))")
     List<Product> searchProducts(@Param("query") String query);
     
-    @Query("SELECT DISTINCT p.category FROM Product p WHERE p.active = true ORDER BY p.category")
+    // Get distinct category names from products (via category relationship)
+    @Query("SELECT DISTINCT p.category.name FROM Product p WHERE p.active = true AND p.category IS NOT NULL ORDER BY p.category.name")
     List<String> findAllCategories();
     
     long countByActiveTrue();

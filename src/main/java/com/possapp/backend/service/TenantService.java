@@ -259,7 +259,7 @@ public class TenantService {
         
         // Create indexes
         statement.executeUpdate(String.format(
-            "CREATE INDEX IF NOT EXISTS idx_products_category ON %s.products(category)", schemaName));
+            "CREATE INDEX IF NOT EXISTS idx_products_category ON %s.products(category_id)", schemaName));
         statement.executeUpdate(String.format(
             "CREATE INDEX IF NOT EXISTS idx_receipts_timestamp ON %s.receipts(timestamp)", schemaName));
         statement.executeUpdate(String.format(

@@ -29,7 +29,7 @@ public class Category {
     @Column(name = "display_order")
     private Integer displayOrder;
     
-    @Column(nullable = false)
+    @Column(name = "is_active", nullable = false)
     @Builder.Default
     private boolean active = true;
     
