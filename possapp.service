@@ -23,10 +23,10 @@ Environment="SERVER_PORT=8080"
 # Environment="DB_NAME=possapp_db"
 # Environment="DB_USER=postgres"
 # Environment="DB_PASSWORD=your-database-password"
-# Environment="SMTP_HOST=smtp.gmail.com"
-# Environment="SMTP_PORT=587"
-# Environment="SMTP_USERNAME=your-email@gmail.com"
-# Environment="SMTP_PASSWORD=your-app-password"
+Environment="SMTP_HOST=smtp.gmail.com"
+Environment="SMTP_PORT=587"
+Environment="SMTP_USERNAME=poswizapp@gmail.com"
+Environment="SMTP_PASSWORD=cyywghsdxjyopwtd"
 
 # Java command
 ExecStart=/usr/bin/java -jar /opt/possapp/possapp-backend-1.0.0.jar

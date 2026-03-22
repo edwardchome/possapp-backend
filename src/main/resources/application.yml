@@ -43,18 +43,44 @@ spring:
     create-schemas: true
 
   # Email Configuration
+#  mail:
+#    host: smtp.gmail.com
+#    port: 587
+#    username: poswizapp@gmail.com
+#    password: cyywghsdxjyopwtd
+#    properties:
+#      mail:
+#        smtp:
+#          auth: true
+#          starttls:
+#            enable: true
+#        debug: false
+  #mailtrap
+#  mail:
+#    host: sandbox.smtp.mailtrap.io
+#    port: 587
+#    username: f2380ee561b252
+#    password: ade7cc59561fa6
+#    properties:
+#      mail:
+#        smtp:
+#          auth: true
+#          starttls:
+#            enable: true
+#        debug: false
+  # mailhog
   mail:
-    host: smtp.gmail.com
-    port: 587
-    username: poswizapp@gmail.com
-    password: cyywghsdxjyopwtd
+    host: localhost
+    port: 1025
+    username: ""   # not needed
+    password: ""   # not needed
     properties:
       mail:
         smtp:
-          auth: true
+          auth: false
           starttls:
-            enable: true
-        debug: false
+            enable: false
+        debug: true
 
 # JWT Configuration
 jwt:
