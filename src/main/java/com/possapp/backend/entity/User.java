@@ -39,6 +39,14 @@ public class User {
     @Builder.Default
     private String role = "USER"; // USER, ADMIN, MANAGER
     
+    @Column(name = "can_manage_products", nullable = false)
+    @Builder.Default
+    private boolean canManageProducts = false; // Add/edit products
+    
+    @Column(name = "can_manage_inventory", nullable = false)
+    @Builder.Default
+    private boolean canManageInventory = false; // Add inventory
+    
     @Column(name = "is_active", nullable = false)
     @Builder.Default
     private boolean active = true;

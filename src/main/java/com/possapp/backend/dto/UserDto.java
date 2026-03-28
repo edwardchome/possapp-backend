@@ -22,6 +22,8 @@ public class UserDto {
     private String fullName;
     private String phoneNumber;
     private String role;
+    private boolean canManageProducts;
+    private boolean canManageInventory;
     private boolean active;
     private boolean emailVerified;
     private boolean passwordChangeRequired;

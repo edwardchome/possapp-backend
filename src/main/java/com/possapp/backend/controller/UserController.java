@@ -80,6 +80,8 @@ public class UserController {
             .lastName(request.getLastName())
             .phoneNumber(request.getPhoneNumber())
             .role(request.getRole() != null ? request.getRole() : "USER")
+            .canManageProducts(request.getCanManageProducts() != null ? request.getCanManageProducts() : false)
+            .canManageInventory(request.getCanManageInventory() != null ? request.getCanManageInventory() : false)
             .emailVerified(true) // Admin-created users are pre-verified
             .active(true)
             .passwordChangeRequired(true) // Require password change on first login
@@ -148,6 +150,12 @@ public class UserController {
         }
         if (request.getRole() != null) {
             user.setRole(request.getRole());
+        }
+        if (request.getCanManageProducts() != null) {
+            user.setCanManageProducts(request.getCanManageProducts());
+        }
+        if (request.getCanManageInventory() != null) {
+            user.setCanManageInventory(request.getCanManageInventory());
         }
 
         user = userRepository.save(user);
@@ -239,6 +247,8 @@ public class UserController {
                 : user.getEmail())
             .phoneNumber(user.getPhoneNumber())
             .role(user.getRole())
+            .canManageProducts(user.isCanManageProducts())
+            .canManageInventory(user.isCanManageInventory())
             .emailVerified(user.isEmailVerified())
             .active(user.isActive())
             .passwordChangeRequired(user.isPasswordChangeRequired())

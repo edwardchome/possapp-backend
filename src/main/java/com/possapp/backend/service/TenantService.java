@@ -144,6 +144,8 @@ public class TenantService {
                 last_name VARCHAR(100),
                 phone_number VARCHAR(50),
                 role VARCHAR(50) NOT NULL DEFAULT 'USER',
+                can_manage_products BOOLEAN NOT NULL DEFAULT false,
+                can_manage_inventory BOOLEAN NOT NULL DEFAULT false,
                 is_active BOOLEAN NOT NULL DEFAULT true,
                 email_verified BOOLEAN NOT NULL DEFAULT false,
                 email_verification_token VARCHAR(255),

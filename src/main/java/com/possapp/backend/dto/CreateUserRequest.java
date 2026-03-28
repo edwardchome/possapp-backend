@@ -23,4 +23,8 @@ public class CreateUserRequest {
     private String phoneNumber;
     
     private String role = "USER"; // Default role
+    
+    private Boolean canManageProducts; // null = false
+    
+    private Boolean canManageInventory; // null = false
 }

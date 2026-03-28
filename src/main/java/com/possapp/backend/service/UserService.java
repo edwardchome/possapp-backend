@@ -216,6 +216,8 @@ public class UserService implements UserDetailsService {
             .fullName(user.getFullName())
             .phoneNumber(user.getPhoneNumber())
             .role(user.getRole())
+            .canManageProducts(user.isCanManageProducts())
+            .canManageInventory(user.isCanManageInventory())
             .active(user.isActive())
             .emailVerified(user.isEmailVerified())
             .passwordChangeRequired(user.isPasswordChangeRequired())
