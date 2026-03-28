@@ -258,6 +258,26 @@ public class TenantService {
             )
             """, schemaName));
         
+        // Inventory transactions table
+        statement.executeUpdate(String.format("""
+            CREATE TABLE IF NOT EXISTS %s.inventory_transactions (
+                id VARCHAR(36) PRIMARY KEY DEFAULT gen_random_uuid()::text,
+                product_code VARCHAR(100) NOT NULL,
+                quantity INTEGER NOT NULL,
+                previous_stock INTEGER NOT NULL,
+                new_stock INTEGER NOT NULL,
+                unit_cost DECIMAL(10, 2),
+                total_cost DECIMAL(10, 2),
+                reference_number VARCHAR(255),
+                supplier_name VARCHAR(255),
+                notes TEXT,
+                transaction_type VARCHAR(20) NOT NULL DEFAULT 'STOCK_IN',
+                created_by VARCHAR(100),
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (product_code) REFERENCES %s.products(code)
+            )
+            """, schemaName, schemaName));
+        
         // Create indexes
         statement.executeUpdate(String.format(
             "CREATE INDEX IF NOT EXISTS idx_products_category ON %s.products(category_id)", schemaName));
@@ -265,6 +285,10 @@ public class TenantService {
             "CREATE INDEX IF NOT EXISTS idx_receipts_timestamp ON %s.receipts(timestamp)", schemaName));
         statement.executeUpdate(String.format(
             "CREATE INDEX IF NOT EXISTS idx_receipt_items_receipt ON %s.receipt_items(receipt_id)", schemaName));
+        statement.executeUpdate(String.format(
+            "CREATE INDEX IF NOT EXISTS idx_inv_trans_product ON %s.inventory_transactions(product_code)", schemaName));
+        statement.executeUpdate(String.format(
+            "CREATE INDEX IF NOT EXISTS idx_inv_trans_date ON %s.inventory_transactions(created_at)", schemaName));
         
         log.info("Created tables in schema: {}", schemaName);
     }
