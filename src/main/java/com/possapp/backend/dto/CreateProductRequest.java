@@ -21,6 +21,9 @@ public class CreateProductRequest {
     @PositiveOrZero(message = "Price must be zero or positive")
     private BigDecimal price;
     
+    @PositiveOrZero(message = "Selling price must be zero or positive")
+    private BigDecimal sellingPrice;
+    
     @NotNull(message = "Stock is required")
     @Min(value = 0, message = "Stock cannot be negative")
     private Integer stock;

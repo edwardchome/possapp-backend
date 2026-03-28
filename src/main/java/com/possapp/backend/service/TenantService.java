@@ -181,6 +181,7 @@ public class TenantService {
                 code VARCHAR(100) PRIMARY KEY,
                 name VARCHAR(255) NOT NULL,
                 price DECIMAL(10, 2) NOT NULL,
+                selling_price DECIMAL(10, 2),
                 stock INTEGER NOT NULL DEFAULT 0,
                 category_id VARCHAR(36),
                 description TEXT,

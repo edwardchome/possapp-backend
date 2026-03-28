@@ -71,7 +71,7 @@ spring:
   # mailhog
   mail:
     host: localhost
-    port: 1025
+    port:  1025 #2500 -mailhog 1025 mailslurp 2500
     username: ""   # not needed
     password: ""   # not needed
     properties:
