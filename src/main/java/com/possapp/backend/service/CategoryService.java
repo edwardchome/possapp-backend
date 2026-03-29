@@ -20,9 +20,14 @@ public class CategoryService {
     private final CategoryRepository categoryRepository;
     
     @Transactional(readOnly = true)
-    public List<CategoryDto> getAllCategories() {
-        return categoryRepository.findByActiveTrueOrderByDisplayOrderAsc()
-                .stream()
+    public List<CategoryDto> getAllCategories(boolean includeInactive) {
+        List<Category> categories;
+        if (includeInactive) {
+            categories = categoryRepository.findAllByOrderByDisplayOrderAsc();
+        } else {
+            categories = categoryRepository.findByActiveTrueOrderByDisplayOrderAsc();
+        }
+        return categories.stream()
                 .map(this::mapToDto)
                 .collect(Collectors.toList());
     }

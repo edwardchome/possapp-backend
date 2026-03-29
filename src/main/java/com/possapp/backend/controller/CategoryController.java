@@ -28,10 +28,12 @@ public class CategoryController {
     @GetMapping
     @Operation(
         summary = "Get all categories",
-        description = "Get all active categories ordered by display order"
+        description = "Get all categories ordered by display order. Use includeInactive=true to include inactive categories."
     )
-    public ResponseEntity<ApiResponse<List<CategoryDto>>> getAllCategories() {
-        List<CategoryDto> categories = categoryService.getAllCategories();
+    public ResponseEntity<ApiResponse<List<CategoryDto>>> getAllCategories(
+            @Parameter(description = "Include inactive categories")
+            @RequestParam(required = false, defaultValue = "false") boolean includeInactive) {
+        List<CategoryDto> categories = categoryService.getAllCategories(includeInactive);
         return ResponseEntity.ok(ApiResponse.success(categories));
     }
     
