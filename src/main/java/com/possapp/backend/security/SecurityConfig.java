@@ -1,6 +1,7 @@
 package com.possapp.backend.security;
 
 import com.possapp.backend.config.TenantFilter;
+import com.possapp.backend.repository.UserRepository;
 import com.possapp.backend.service.TenantService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
@@ -35,6 +36,7 @@ public class SecurityConfig {
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
     private final TenantService tenantService;
+    private final UserRepository userRepository;
     
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -106,6 +108,6 @@ public class SecurityConfig {
     
     @Bean
     public JwtAuthenticationFilter jwtAuthenticationFilter() {
-        return new JwtAuthenticationFilter(jwtTokenProvider, userDetailsService);
+        return new JwtAuthenticationFilter(jwtTokenProvider, userDetailsService, userRepository);
     }
 }

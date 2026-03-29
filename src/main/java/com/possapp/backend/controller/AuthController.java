@@ -83,11 +83,13 @@ public class AuthController {
                 .body(ApiResponse.<AuthResponse>error("Email not verified. Please check your email and verify your account."));
         }
         
-        String token = jwtTokenProvider.generateToken(authentication, tenantId);
+        // Get user details for permissions version
+        UserDto userDto = userService.getUserProfile(request.getEmail());
+        
+        String token = jwtTokenProvider.generateToken(authentication, tenantId, userDto.getPermissionsVersion());
         String refreshToken = jwtTokenProvider.generateRefreshToken(request.getEmail(), tenantId);
         
         userService.updateLastLogin(request.getEmail());
-        UserDto userDto = userService.getUserProfile(request.getEmail());
         
         AuthResponse authResponse = AuthResponse.builder()
             .token(token)
@@ -135,7 +137,10 @@ public class AuthController {
                     .body(ApiResponse.<AuthResponse>error("Tenant context required"));
             }
             
-            String token = jwtTokenProvider.generateToken(authentication, tenantId);
+            // Get user details for permissions version
+            UserDto userDto = userService.getUserProfile(request.getEmail());
+            
+            String token = jwtTokenProvider.generateToken(authentication, tenantId, userDto.getPermissionsVersion());
             String refreshToken = jwtTokenProvider.generateRefreshToken(request.getEmail(), tenantId);
             
             AuthResponse authResponse = AuthResponse.builder()

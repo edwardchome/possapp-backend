@@ -233,8 +233,25 @@ public class UserService implements UserDetailsService {
             .active(user.isActive())
             .emailVerified(user.isEmailVerified())
             .passwordChangeRequired(user.isPasswordChangeRequired())
+            .permissionsVersion(user.getPermissionsVersion())
             .createdAt(user.getCreatedAt())
             .lastLoginAt(user.getLastLoginAt())
             .build();
+    }
+    
+    @Transactional
+    public void incrementPermissionsVersion(String userId) {
+        User user = userRepository.findById(userId)
+            .orElseThrow(() -> new UserException("User not found: " + userId));
+        user.setPermissionsVersion(user.getPermissionsVersion() + 1);
+        userRepository.save(user);
+        log.info("Permissions version incremented for user: {} to version: {}", user.getEmail(), user.getPermissionsVersion());
+    }
+    
+    @Transactional(readOnly = true)
+    public Long getPermissionsVersion(String userId) {
+        return userRepository.findById(userId)
+            .map(User::getPermissionsVersion)
+            .orElse(null);
     }
 }

@@ -126,7 +126,7 @@ public class UserController {
     @PutMapping("/{id}")
     @Operation(
         summary = "Update user",
-        description = "Update user details (Admin only)"
+        description = "Update user details (Admin only). Changing role or permissions will invalidate user's session."
     )
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<ApiResponse<UserDto>> updateUser(
@@ -137,6 +137,14 @@ public class UserController {
         
         User user = userRepository.findById(id)
             .orElseThrow(() -> new UserException("User not found: " + id));
+
+        // Track if role or permissions are being changed
+        boolean roleChanged = request.getRole() != null && !request.getRole().equals(user.getRole());
+        boolean productsPermissionChanged = request.getCanManageProducts() != null && 
+                                            request.getCanManageProducts() != user.isCanManageProducts();
+        boolean inventoryPermissionChanged = request.getCanManageInventory() != null && 
+                                             request.getCanManageInventory() != user.isCanManageInventory();
+        boolean permissionsChanged = roleChanged || productsPermissionChanged || inventoryPermissionChanged;
 
         // Update fields
         if (request.getFirstName() != null) {
@@ -158,10 +166,20 @@ public class UserController {
             user.setCanManageInventory(request.getCanManageInventory());
         }
 
+        // Increment permissions version if role or permissions changed
+        // This will force the user to logout and login again
+        if (permissionsChanged) {
+            user.setPermissionsVersion(user.getPermissionsVersion() + 1);
+            log.info("User permissions changed for: {}. New version: {}. User will be forced to logout.", 
+                     user.getEmail(), user.getPermissionsVersion());
+        }
+
         user = userRepository.save(user);
         log.info("User updated: {}", user.getEmail());
 
-        return ResponseEntity.ok(ApiResponse.success("User updated successfully", mapToDto(user)));
+        return ResponseEntity.ok(ApiResponse.success("User updated successfully" + 
+            (permissionsChanged ? ". User's session has been invalidated due to permission changes." : ""), 
+            mapToDto(user)));
     }
 
     @DeleteMapping("/{id}")

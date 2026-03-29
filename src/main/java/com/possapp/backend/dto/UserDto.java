@@ -27,6 +27,7 @@ public class UserDto {
     private boolean active;
     private boolean emailVerified;
     private boolean passwordChangeRequired;
+    private Long permissionsVersion;
     private LocalDateTime createdAt;
     private LocalDateTime lastLoginAt;
 }

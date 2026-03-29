@@ -52,6 +52,28 @@ public class JwtTokenProvider {
             .compact();
     }
     
+    public String generateToken(Authentication authentication, String tenantId, Long permissionsVersion) {
+        String username = authentication.getName();
+        Date now = new Date();
+        Date expiryDate = new Date(now.getTime() + jwtExpirationMs);
+        
+        // Extract role from authorities
+        String role = authentication.getAuthorities().stream()
+            .findFirst()
+            .map(auth -> auth.getAuthority().replace("ROLE_", ""))
+            .orElse("USER");
+        
+        return Jwts.builder()
+            .subject(username)
+            .claim("tenantId", tenantId)
+            .claim("role", role)
+            .claim("permissionsVersion", permissionsVersion != null ? permissionsVersion : 1L)
+            .issuedAt(now)
+            .expiration(expiryDate)
+            .signWith(getSigningKey(), Jwts.SIG.HS512)
+            .compact();
+    }
+    
     public String generateToken(String email, String tenantId) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + jwtExpirationMs);
@@ -97,6 +119,27 @@ public class JwtTokenProvider {
             .getPayload();
         
         return claims.get("tenantId", String.class);
+    }
+    
+    public Long getPermissionsVersionFromToken(String token) {
+        Claims claims = Jwts.parser()
+            .verifyWith(getSigningKey())
+            .build()
+            .parseSignedClaims(token)
+            .getPayload();
+        
+        Object version = claims.get("permissionsVersion");
+        if (version == null) {
+            return null;
+        }
+        if (version instanceof Number) {
+            return ((Number) version).longValue();
+        }
+        try {
+            return Long.parseLong(version.toString());
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
     
     public boolean validateToken(String token) {

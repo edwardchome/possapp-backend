@@ -1,5 +1,7 @@
 package com.possapp.backend.security;
 
+import com.possapp.backend.entity.User;
+import com.possapp.backend.repository.UserRepository;
 import com.possapp.backend.tenant.TenantContext;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -11,20 +13,25 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
+import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.Optional;
 
 @Slf4j
+@Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
     
     private final JwtTokenProvider jwtTokenProvider;
     private final UserDetailsService userDetailsService;
+    private final UserRepository userRepository;
     
-    public JwtAuthenticationFilter(JwtTokenProvider jwtTokenProvider, UserDetailsService userDetailsService) {
+    public JwtAuthenticationFilter(JwtTokenProvider jwtTokenProvider, UserDetailsService userDetailsService, UserRepository userRepository) {
         this.jwtTokenProvider = jwtTokenProvider;
         this.userDetailsService = userDetailsService;
+        this.userRepository = userRepository;
     }
     
     @Override
@@ -68,6 +75,25 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 
                 String username = jwtTokenProvider.getUsernameFromToken(jwt);
                 log.debug("JWT valid for user: {} in tenant: {}", username, tokenTenantId);
+                
+                // Check permissions version
+                Long tokenPermissionsVersion = jwtTokenProvider.getPermissionsVersionFromToken(jwt);
+                Optional<User> userOpt = userRepository.findByEmail(username);
+                
+                if (userOpt.isPresent()) {
+                    User user = userOpt.get();
+                    Long currentPermissionsVersion = user.getPermissionsVersion();
+                    
+                    // If token has permissionsVersion and it doesn't match current, reject the token
+                    if (tokenPermissionsVersion != null && 
+                        !tokenPermissionsVersion.equals(currentPermissionsVersion)) {
+                        log.warn("Permissions version mismatch for user: {}. Token: {}, Current: {}. Forcing logout.", 
+                                username, tokenPermissionsVersion, currentPermissionsVersion);
+                        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                        response.getWriter().write("{\"error\":\"PERMISSIONS_CHANGED\",\"message\":\"Your permissions have been changed. Please login again.\"}");
+                        return;
+                    }
+                }
                 
                 UserDetails userDetails = userDetailsService.loadUserByUsername(username);
                 log.debug("UserDetails loaded: {}", userDetails.getUsername());

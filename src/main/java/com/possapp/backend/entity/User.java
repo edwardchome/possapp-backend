@@ -82,6 +82,10 @@ public class User {
     @Column(name = "last_login_at")
     private LocalDateTime lastLoginAt;
     
+    @Column(name = "permissions_version", nullable = false)
+    @Builder.Default
+    private Long permissionsVersion = 1L;
+    
     public String getFullName() {
         if (firstName == null && lastName == null) return email;
         return String.format("%s %s", 
