@@ -285,6 +285,36 @@ public class TenantService {
             )
             """, schemaName, schemaName));
         
+        // Units of measure table
+        statement.executeUpdate(String.format("""
+            CREATE TABLE IF NOT EXISTS %s.units_of_measure (
+                id VARCHAR(36) PRIMARY KEY DEFAULT gen_random_uuid()::text,
+                name VARCHAR(255) NOT NULL,
+                symbol VARCHAR(50) NOT NULL UNIQUE,
+                type VARCHAR(20) NOT NULL,
+                description TEXT,
+                allow_fractions BOOLEAN NOT NULL DEFAULT false,
+                default_precision INTEGER DEFAULT 0,
+                is_active BOOLEAN NOT NULL DEFAULT true,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """, schemaName));
+        
+        // Insert default units of measure
+        statement.executeUpdate(String.format("""
+            INSERT INTO %s.units_of_measure (name, symbol, type, description, allow_fractions, default_precision, is_active) VALUES
+                ('Pieces', 'pcs', 'COUNT', 'Individual items', false, 0, true),
+                ('Kilogram', 'kg', 'WEIGHT', 'Weight in kilograms', true, 3, true),
+                ('Gram', 'g', 'WEIGHT', 'Weight in grams', true, 0, true),
+                ('Liter', 'LT', 'VOLUME', 'Volume in liters', true, 2, true),
+                ('Milliliter', 'ml', 'VOLUME', 'Volume in milliliters', true, 0, true),
+                ('Meter', 'm', 'LENGTH', 'Length in meters', true, 2, true),
+                ('Centimeter', 'cm', 'LENGTH', 'Length in centimeters', true, 1, true),
+                ('Square Meter', 'm²', 'AREA', 'Area in square meters', true, 2, true)
+            ON CONFLICT (symbol) DO NOTHING
+            """, schemaName));
+        
         // Create indexes
         statement.executeUpdate(String.format(
             "CREATE INDEX IF NOT EXISTS idx_products_category ON %s.products(category_id)", schemaName));
