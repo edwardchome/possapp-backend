@@ -153,6 +153,7 @@ public class TenantService {
                 password_change_required BOOLEAN NOT NULL DEFAULT false,
                 password_reset_token VARCHAR(255),
                 password_reset_expiry TIMESTAMP,
+                permissions_version BIGINT NOT NULL DEFAULT 1,
                 created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 last_login_at TIMESTAMP
