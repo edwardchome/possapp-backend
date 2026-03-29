@@ -33,6 +33,13 @@ public class UnitOfMeasureController {
         return ResponseEntity.ok(ApiResponse.success(units));
     }
     
+    @GetMapping("/all")
+    @Operation(summary = "Get all units including inactive", description = "Get all units including inactive (for admin)")
+    public ResponseEntity<ApiResponse<List<UnitOfMeasure>>> getAllUnitsIncludingInactive() {
+        List<UnitOfMeasure> units = unitRepository.findAll();
+        return ResponseEntity.ok(ApiResponse.success(units));
+    }
+    
     @GetMapping("/{id}")
     @Operation(summary = "Get unit by ID", description = "Get a specific unit of measure")
     public ResponseEntity<ApiResponse<UnitOfMeasure>> getUnitById(@PathVariable String id) {
@@ -91,6 +98,19 @@ public class UnitOfMeasureController {
             unit.setActive(false);
             unitRepository.save(unit);
             return ResponseEntity.ok(ApiResponse.success("Unit deleted successfully", null));
+        }
+        return ResponseEntity.notFound().build();
+    }
+    
+    @PostMapping("/{id}/restore")
+    @Operation(summary = "Restore unit", description = "Restore (reactivate) a unit of measure")
+    public ResponseEntity<ApiResponse<UnitOfMeasure>> restoreUnit(@PathVariable String id) {
+        Optional<UnitOfMeasure> unitOpt = unitRepository.findById(id);
+        if (unitOpt.isPresent()) {
+            UnitOfMeasure unit = unitOpt.get();
+            unit.setActive(true);
+            UnitOfMeasure saved = unitRepository.save(unit);
+            return ResponseEntity.ok(ApiResponse.success("Unit restored successfully", saved));
         }
         return ResponseEntity.notFound().build();
     }
