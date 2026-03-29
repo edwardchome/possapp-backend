@@ -17,6 +17,6 @@ public class ReceiptItemDto {
     private String productCode;
     private String productName;
     private BigDecimal price;
-    private Integer qty;
+    private BigDecimal qty;
     private BigDecimal lineTotal;
 }

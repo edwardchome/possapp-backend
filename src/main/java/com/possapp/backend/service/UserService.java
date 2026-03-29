@@ -39,10 +39,22 @@ public class UserService implements UserDetailsService {
                 return new UsernameNotFoundException("User not found: " + email);
             });
         
+        // Build authorities including role and custom permissions
+        var authorities = new java.util.ArrayList<org.springframework.security.core.authority.SimpleGrantedAuthority>();
+        authorities.add(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_" + user.getRole()));
+        
+        // Add custom permissions as authorities
+        if (user.isCanManageInventory()) {
+            authorities.add(new org.springframework.security.core.authority.SimpleGrantedAuthority("CAN_MANAGE_INVENTORY"));
+        }
+        if (user.isCanManageProducts()) {
+            authorities.add(new org.springframework.security.core.authority.SimpleGrantedAuthority("CAN_MANAGE_PRODUCTS"));
+        }
+        
         return org.springframework.security.core.userdetails.User.builder()
             .username(user.getEmail())
             .password(user.getPassword())
-            .roles(user.getRole())
+            .authorities(authorities)
             .accountLocked(!user.isActive())
             .build();
     }

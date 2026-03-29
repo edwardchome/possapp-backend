@@ -19,9 +19,9 @@ public class InventoryTransactionDto {
     private String id;
     private String productCode;
     private String productName;
-    private Integer quantity;
-    private Integer previousStock;
-    private Integer newStock;
+    private BigDecimal quantity;
+    private BigDecimal previousStock;
+    private BigDecimal newStock;
     private BigDecimal unitCost;
     private BigDecimal totalCost;
     private String referenceNumber;

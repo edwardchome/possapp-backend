@@ -31,8 +31,8 @@ public class ReceiptItem {
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal price;
     
-    @Column(nullable = false)
-    private Integer qty;
+    @Column(nullable = false, precision = 15, scale = 4)
+    private BigDecimal qty;
     
     @Column(name = "line_total", nullable = false, precision = 10, scale = 2)
     private BigDecimal lineTotal;
@@ -41,7 +41,7 @@ public class ReceiptItem {
     @PreUpdate
     public void prePersist() {
         if (price != null && qty != null) {
-            this.lineTotal = price.multiply(BigDecimal.valueOf(qty));
+            this.lineTotal = price.multiply(qty);
         }
     }
 }

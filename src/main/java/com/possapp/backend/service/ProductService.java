@@ -69,17 +69,22 @@ public class ProductService {
             .name(request.getName())
             .price(request.getPrice())
             .sellingPrice(request.getSellingPrice())
-            .stock(request.getStock())
+            .stock(request.getStock() != null ? request.getStock() : BigDecimal.ZERO)
             .category(category)
             .description(request.getDescription())
             .imageUrl(request.getImageUrl())
             .costPrice(request.getCostPrice())
-            .minStockLevel(request.getMinStockLevel())
+            .minStockLevel(request.getMinStockLevel() != null ? request.getMinStockLevel() : BigDecimal.ZERO)
+            // Unit of measurement fields
+            .unitOfMeasure(request.getUnitOfMeasure() != null ? request.getUnitOfMeasure() : "PCS")
+            .allowDecimal(request.getAllowDecimal() != null ? request.getAllowDecimal() : false)
+            .minQuantity(request.getMinQuantity() != null ? request.getMinQuantity() : BigDecimal.ONE)
+            .stepQuantity(request.getStepQuantity() != null ? request.getStepQuantity() : BigDecimal.ONE)
             .active(true)
             .build();
         
         product = productRepository.save(product);
-        log.info("Created product: {}", product.getCode());
+        log.info("Created product: {} with unit: {}", product.getCode(), product.getUnitOfMeasure());
         return mapToDto(product);
     }
     
@@ -104,6 +109,20 @@ public class ProductService {
         product.setCostPrice(request.getCostPrice());
         product.setMinStockLevel(request.getMinStockLevel());
         
+        // Update unit of measurement fields
+        if (request.getUnitOfMeasure() != null) {
+            product.setUnitOfMeasure(request.getUnitOfMeasure());
+        }
+        if (request.getAllowDecimal() != null) {
+            product.setAllowDecimal(request.getAllowDecimal());
+        }
+        if (request.getMinQuantity() != null) {
+            product.setMinQuantity(request.getMinQuantity());
+        }
+        if (request.getStepQuantity() != null) {
+            product.setStepQuantity(request.getStepQuantity());
+        }
+        
         product = productRepository.save(product);
         log.info("Updated product: {}", product.getCode());
         return mapToDto(product);
@@ -113,14 +132,15 @@ public class ProductService {
     public void deleteProduct(String code) {
         Product product = productRepository.findByCodeAndActiveTrue(code)
             .orElseThrow(() -> new ProductException("Product not found: " + code));
+        
         product.setActive(false);
         productRepository.save(product);
         log.info("Deleted product: {}", code);
     }
     
     @Transactional
-    public ProductDto updateStock(String code, int newStock) {
-        if (newStock < 0) {
+    public ProductDto updateStock(String code, BigDecimal newStock) {
+        if (newStock == null || newStock.compareTo(BigDecimal.ZERO) < 0) {
             throw new ProductException("Stock cannot be negative");
         }
         
@@ -134,14 +154,13 @@ public class ProductService {
     }
     
     @Transactional
-    public ProductDto adjustStock(String code, int delta) {
+    public ProductDto adjustStock(String code, BigDecimal delta) {
         Product product = productRepository.findByCodeAndActiveTrue(code)
             .orElseThrow(() -> new ProductException("Product not found: " + code));
         
-        int newStock = Math.max(0, product.getStock() + delta);
-        product.setStock(newStock);
+        product.adjustStock(delta);
         product = productRepository.save(product);
-        log.info("Adjusted stock for product {}: {} (delta: {})", code, newStock, delta);
+        log.info("Adjusted stock for product {}: {} (delta: {})", code, product.getStock(), delta);
         return mapToDto(product);
     }
     
@@ -168,7 +187,7 @@ public class ProductService {
     
     @Transactional(readOnly = true)
     public List<ProductDto> getLowStockProducts() {
-        return productRepository.findByStockLessThanEqualAndActiveTrue(10)
+        return productRepository.findByStockLessThanEqualAndActiveTrue(BigDecimal.valueOf(10))
             .stream()
             .map(this::mapToDto)
             .collect(Collectors.toList());
@@ -188,7 +207,12 @@ public class ProductService {
             .active(product.isActive())
             .lowStock(product.isLowStock())
             .createdAt(product.getCreatedAt())
-            .updatedAt(product.getUpdatedAt());
+            .updatedAt(product.getUpdatedAt())
+            // Unit of measurement fields
+            .unitOfMeasure(product.getUnitOfMeasure())
+            .allowDecimal(product.getAllowDecimal())
+            .minQuantity(product.getMinQuantity())
+            .stepQuantity(product.getStepQuantity());
         
         if (product.getCategory() != null) {
             builder.categoryId(product.getCategory().getId())

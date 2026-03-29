@@ -25,8 +25,8 @@ public class CreateProductRequest {
     private BigDecimal sellingPrice;
     
     @NotNull(message = "Stock is required")
-    @Min(value = 0, message = "Stock cannot be negative")
-    private Integer stock;
+    @PositiveOrZero(message = "Stock cannot be negative")
+    private BigDecimal stock;
     
     private String categoryId;
     private String description;
@@ -35,6 +35,17 @@ public class CreateProductRequest {
     @PositiveOrZero(message = "Cost price must be zero or positive")
     private BigDecimal costPrice;
     
-    @Min(value = 0, message = "Min stock level cannot be negative")
-    private Integer minStockLevel = 0;
+    @PositiveOrZero(message = "Min stock level cannot be negative")
+    private BigDecimal minStockLevel = BigDecimal.ZERO;
+    
+    // Unit of measurement fields
+    private String unitOfMeasure = "PCS";
+    
+    private Boolean allowDecimal = false;
+    
+    @PositiveOrZero(message = "Min quantity cannot be negative")
+    private BigDecimal minQuantity = BigDecimal.ONE;
+    
+    @PositiveOrZero(message = "Step quantity cannot be negative")
+    private BigDecimal stepQuantity = BigDecimal.ONE;
 }

@@ -67,10 +67,11 @@ public class ReceiptService {
             Product product = productRepository.findByCodeAndActiveTrue(item.getCode())
                 .orElseThrow(() -> new ReceiptException("Product not found: " + item.getCode()));
             
-            if (product.getStock() < item.getQuantity()) {
+            BigDecimal requestedQty = item.getQuantity();
+            if (product.getStock().compareTo(requestedQty) < 0) {
                 throw new ReceiptException(
-                    String.format("Insufficient stock for %s. Available: %d, Requested: %d",
-                        product.getName(), product.getStock(), item.getQuantity()));
+                    String.format("Insufficient stock for %s. Available: %s, Requested: %s",
+                        product.getName(), product.getStock(), requestedQty));
             }
         }
         
@@ -105,16 +106,18 @@ public class ReceiptService {
                 .orElseThrow(() -> new ReceiptException("Product not found: " + itemRequest.getCode()));
             
             // Update stock
-            product.setStock(product.getStock() - itemRequest.getQuantity());
+            BigDecimal saleQty = itemRequest.getQuantity();
+            product.setStock(product.getStock().subtract(saleQty));
             productRepository.save(product);
             
-            // Create receipt item
+            // Create receipt item - use selling price, not cost price
+            BigDecimal sellingPrice = product.getSellingPrice() != null ? product.getSellingPrice() : product.getPrice();
             ReceiptItem item = ReceiptItem.builder()
                 .productCode(product.getCode())
                 .productName(product.getName())
-                .price(product.getPrice())
-                .qty(itemRequest.getQuantity())
-                .lineTotal(product.getPrice().multiply(BigDecimal.valueOf(itemRequest.getQuantity())))
+                .price(sellingPrice)
+                .qty(saleQty)
+                .lineTotal(sellingPrice.multiply(saleQty))
                 .build();
             
             receipt.addItem(item);
@@ -144,7 +147,8 @@ public class ReceiptService {
         for (ReceiptItem item : receipt.getItems()) {
             productRepository.findByCodeAndActiveTrue(item.getProductCode())
                 .ifPresent(product -> {
-                    product.setStock(product.getStock() + item.getQty());
+                    BigDecimal returnQty = item.getQty();
+                    product.setStock(product.getStock().add(returnQty));
                     productRepository.save(product);
                 });
         }

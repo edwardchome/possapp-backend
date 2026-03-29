@@ -34,10 +34,10 @@ public class InventoryTransactionController {
     private final InventoryTransactionService inventoryService;
     
     @PostMapping("/add")
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_MANAGER')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_MANAGER', 'CAN_MANAGE_INVENTORY')")
     @Operation(
         summary = "Add stock to product",
-        description = "Add inventory to an existing product (Admin/Manager only)"
+        description = "Add inventory to an existing product (Admin/Manager or users with inventory permission)"
     )
     public ResponseEntity<ApiResponse<InventoryTransactionDto>> addStock(
             @Parameter(description = "Inventory addition details", required = true)
@@ -48,7 +48,7 @@ public class InventoryTransactionController {
         InventoryTransactionDto transaction = inventoryService.addStock(request, createdBy);
         
         return ResponseEntity.ok(ApiResponse.success(
-            String.format("Added %d units. Stock: %d → %d", 
+            String.format("Added %s units. Stock: %s → %s", 
                 transaction.getQuantity(), 
                 transaction.getPreviousStock(), 
                 transaction.getNewStock()),

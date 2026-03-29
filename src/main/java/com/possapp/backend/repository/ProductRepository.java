@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
@@ -23,7 +24,7 @@ public interface ProductRepository extends JpaRepository<Product, String> {
     // Query by category ID - used when you only have the category ID string
     List<Product> findByCategoryIdAndActiveTrueOrderByNameAsc(String categoryId);
     
-    List<Product> findByStockLessThanEqualAndActiveTrue(Integer threshold);
+    List<Product> findByStockLessThanEqualAndActiveTrue(BigDecimal threshold);
     
     boolean existsByCode(String code);
     
@@ -40,5 +41,5 @@ public interface ProductRepository extends JpaRepository<Product, String> {
     
     long countByActiveTrue();
     
-    long countByStockLessThanEqualAndActiveTrue(Integer threshold);
+    long countByStockLessThanEqualAndActiveTrue(BigDecimal threshold);
 }

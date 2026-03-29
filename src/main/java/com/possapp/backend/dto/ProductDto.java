@@ -20,15 +20,21 @@ public class ProductDto {
     private String name;
     private BigDecimal price;
     private BigDecimal sellingPrice;
-    private Integer stock;
+    private BigDecimal stock;
     private String categoryId;
     private String categoryName;
     private String description;
     private String imageUrl;
     private BigDecimal costPrice;
-    private Integer minStockLevel;
+    private BigDecimal minStockLevel;
     private boolean active;
     private boolean lowStock;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    
+    // Unit of measurement fields
+    private String unitOfMeasure;
+    private Boolean allowDecimal;
+    private BigDecimal minQuantity;
+    private BigDecimal stepQuantity;
 }

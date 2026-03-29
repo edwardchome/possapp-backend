@@ -14,6 +14,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 
@@ -99,8 +100,8 @@ public class ProductController {
             @Parameter(description = "Product code/SKU", required = true)
             @PathVariable String code,
             @Parameter(description = "Stock update request", required = true)
-            @RequestBody Map<String, Integer> request) {
-        Integer newStock = request.get("stock");
+            @RequestBody Map<String, BigDecimal> request) {
+        BigDecimal newStock = request.get("stock");
         ProductDto product = productService.updateStock(code, newStock);
         return ResponseEntity.ok(ApiResponse.success("Stock updated", product));
     }
@@ -114,8 +115,8 @@ public class ProductController {
             @Parameter(description = "Product code/SKU", required = true)
             @PathVariable String code,
             @Parameter(description = "Stock adjustment request", required = true)
-            @RequestBody Map<String, Integer> request) {
-        Integer delta = request.get("delta");
+            @RequestBody Map<String, BigDecimal> request) {
+        BigDecimal delta = request.get("delta");
         ProductDto product = productService.adjustStock(code, delta);
         return ResponseEntity.ok(ApiResponse.success("Stock adjusted", product));
     }

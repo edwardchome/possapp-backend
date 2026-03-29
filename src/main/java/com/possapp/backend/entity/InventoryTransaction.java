@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
@@ -26,20 +27,20 @@ public class InventoryTransaction {
     @JoinColumn(name = "product_code", insertable = false, updatable = false)
     private Product product;
     
-    @Column(nullable = false)
-    private Integer quantity;
+    @Column(nullable = false, precision = 15, scale = 4)
+    private BigDecimal quantity;
     
-    @Column(name = "previous_stock", nullable = false)
-    private Integer previousStock;
+    @Column(name = "previous_stock", nullable = false, precision = 15, scale = 4)
+    private BigDecimal previousStock;
     
-    @Column(name = "new_stock", nullable = false)
-    private Integer newStock;
+    @Column(name = "new_stock", nullable = false, precision = 15, scale = 4)
+    private BigDecimal newStock;
     
     @Column(name = "unit_cost", precision = 10, scale = 2)
-    private java.math.BigDecimal unitCost;
+    private BigDecimal unitCost;
     
     @Column(name = "total_cost", precision = 10, scale = 2)
-    private java.math.BigDecimal totalCost;
+    private BigDecimal totalCost;
     
     @Column(name = "reference_number")
     private String referenceNumber;

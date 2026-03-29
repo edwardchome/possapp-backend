@@ -177,19 +177,23 @@ public class TenantService {
             "INSERT INTO %s.categories (id, name, description, display_order, is_active) VALUES (gen_random_uuid(), 'General', 'Default category for products', 0, true) ON CONFLICT (name) DO NOTHING",
             schemaName));
         
-        // Products table with category reference
+        // Products table with category reference and unit of measurement support
         statement.executeUpdate(String.format("""
             CREATE TABLE IF NOT EXISTS %s.products (
                 code VARCHAR(100) PRIMARY KEY,
                 name VARCHAR(255) NOT NULL,
                 price DECIMAL(10, 2) NOT NULL,
                 selling_price DECIMAL(10, 2),
-                stock INTEGER NOT NULL DEFAULT 0,
+                stock DECIMAL(12, 3) NOT NULL DEFAULT 0,
+                unit_of_measure VARCHAR(20) DEFAULT 'PCS',
+                allow_decimal BOOLEAN NOT NULL DEFAULT false,
+                min_quantity DECIMAL(10, 3) DEFAULT 1.000,
+                step_quantity DECIMAL(10, 3) DEFAULT 1.000,
                 category_id VARCHAR(36),
                 description TEXT,
                 image_url VARCHAR(500),
                 cost_price DECIMAL(10, 2),
-                min_stock_level INTEGER DEFAULT 0,
+                min_stock_level DECIMAL(12, 3) DEFAULT 0,
                 is_active BOOLEAN NOT NULL DEFAULT true,
                 created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -223,7 +227,7 @@ public class TenantService {
             )
             """, schemaName));
         
-        // Receipt items table
+        // Receipt items table with fractional quantity support
         statement.executeUpdate(String.format("""
             CREATE TABLE IF NOT EXISTS %s.receipt_items (
                 id VARCHAR(36) PRIMARY KEY DEFAULT gen_random_uuid()::text,
@@ -231,8 +235,8 @@ public class TenantService {
                 product_code VARCHAR(100) NOT NULL,
                 product_name VARCHAR(255) NOT NULL,
                 price DECIMAL(10, 2) NOT NULL,
-                qty INTEGER NOT NULL,
-                line_total DECIMAL(10, 2) NOT NULL
+                qty DECIMAL(15, 4) NOT NULL DEFAULT 0,
+                line_total DECIMAL(10, 2) NOT NULL DEFAULT 0
             )
             """, schemaName, schemaName));
         
@@ -260,14 +264,14 @@ public class TenantService {
             )
             """, schemaName));
         
-        // Inventory transactions table
+        // Inventory transactions table with BigDecimal support
         statement.executeUpdate(String.format("""
             CREATE TABLE IF NOT EXISTS %s.inventory_transactions (
                 id VARCHAR(36) PRIMARY KEY DEFAULT gen_random_uuid()::text,
                 product_code VARCHAR(100) NOT NULL,
-                quantity INTEGER NOT NULL,
-                previous_stock INTEGER NOT NULL,
-                new_stock INTEGER NOT NULL,
+                quantity DECIMAL(15, 4) NOT NULL,
+                previous_stock DECIMAL(15, 4) NOT NULL,
+                new_stock DECIMAL(15, 4) NOT NULL,
                 unit_cost DECIMAL(10, 2),
                 total_cost DECIMAL(10, 2),
                 reference_number VARCHAR(255),

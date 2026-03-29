@@ -30,8 +30,8 @@ public class InventoryTransactionService {
         Product product = productRepository.findById(request.getProductCode())
             .orElseThrow(() -> new ProductException("Product not found: " + request.getProductCode()));
         
-        int previousStock = product.getStock();
-        int newStock = previousStock + request.getQuantity();
+        BigDecimal previousStock = product.getStock();
+        BigDecimal newStock = previousStock.add(request.getQuantity());
         
         // Update product stock
         product.setStock(newStock);
@@ -40,7 +40,7 @@ public class InventoryTransactionService {
         // Calculate total cost
         BigDecimal totalCost = null;
         if (request.getUnitCost() != null) {
-            totalCost = request.getUnitCost().multiply(BigDecimal.valueOf(request.getQuantity()));
+            totalCost = request.getUnitCost().multiply(request.getQuantity());
         }
         
         // Create transaction record
