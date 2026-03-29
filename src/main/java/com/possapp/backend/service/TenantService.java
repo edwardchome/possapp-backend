@@ -5,6 +5,7 @@ import com.possapp.backend.dto.TenantRegistrationRequest;
 import com.possapp.backend.entity.Tenant;
 import com.possapp.backend.exception.TenantException;
 import com.possapp.backend.repository.TenantRepository;
+import com.possapp.backend.tenant.TenantContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
