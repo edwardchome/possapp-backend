@@ -360,4 +360,40 @@ public class TenantService {
             .subscriptionExpiresAt(tenant.getSubscriptionExpiresAt())
             .build();
     }
+    
+    @Transactional(readOnly = true)
+    public TenantDto getCurrentTenant() {
+        String currentSchema = TenantContext.getCurrentTenant();
+        if (currentSchema == null) {
+            return null;
+        }
+        return tenantRepository.findBySchemaName(currentSchema)
+            .map(this::mapToDto)
+            .orElse(null);
+    }
+    
+    @Transactional
+    public TenantDto updateCurrentTenant(TenantDto tenantDto) {
+        String currentSchema = TenantContext.getCurrentTenant();
+        if (currentSchema == null) {
+            throw new TenantException("No tenant context found");
+        }
+        
+        Tenant tenant = tenantRepository.findBySchemaName(currentSchema)
+            .orElseThrow(() -> new TenantException("Tenant not found"));
+        
+        // Update only allowed fields
+        if (tenantDto.getCompanyName() != null) {
+            tenant.setCompanyName(tenantDto.getCompanyName());
+        }
+        if (tenantDto.getContactPhone() != null) {
+            tenant.setContactPhone(tenantDto.getContactPhone());
+        }
+        if (tenantDto.getAddress() != null) {
+            tenant.setAddress(tenantDto.getAddress());
+        }
+        
+        tenant = tenantRepository.save(tenant);
+        return mapToDto(tenant);
+    }
 }

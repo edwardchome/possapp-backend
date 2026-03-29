@@ -90,4 +90,31 @@ public class TenantController {
         tenantService.activateTenant(tenantId.toString());
         return ResponseEntity.ok(ApiResponse.success("Tenant activated", null));
     }
+    
+    @GetMapping("/current")
+    @Operation(
+        summary = "Get current tenant",
+        description = "Get current tenant details based on X-Tenant-ID header",
+        security = @SecurityRequirement(name = "bearerAuth")
+    )
+    public ResponseEntity<ApiResponse<TenantDto>> getCurrentTenant() {
+        TenantDto tenant = tenantService.getCurrentTenant();
+        if (tenant == null) {
+            return ResponseEntity.status(404)
+                    .body(ApiResponse.<TenantDto>error("Tenant not found"));
+        }
+        return ResponseEntity.ok(ApiResponse.success(tenant));
+    }
+    
+    @PutMapping("/current")
+    @Operation(
+        summary = "Update current tenant",
+        description = "Update current tenant business settings",
+        security = @SecurityRequirement(name = "bearerAuth")
+    )
+    public ResponseEntity<ApiResponse<TenantDto>> updateCurrentTenant(
+            @Valid @RequestBody TenantDto tenantDto) {
+        TenantDto updated = tenantService.updateCurrentTenant(tenantDto);
+        return ResponseEntity.ok(ApiResponse.success("Business settings updated", updated));
+    }
 }
