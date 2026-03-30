@@ -27,4 +27,7 @@ public class CreateUserRequest {
     private Boolean canManageProducts; // null = false
     
     private Boolean canManageInventory; // null = false
+    
+    // Branch assignment - optional
+    private String branchId;
 }

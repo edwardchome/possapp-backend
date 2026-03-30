@@ -220,7 +220,7 @@ public class UserService implements UserDetailsService {
     }
     
     public UserDto mapToDto(User user) {
-        return UserDto.builder()
+        UserDto.UserDtoBuilder builder = UserDto.builder()
             .id(user.getId())
             .email(user.getEmail())
             .firstName(user.getFirstName())
@@ -235,8 +235,15 @@ public class UserService implements UserDetailsService {
             .passwordChangeRequired(user.isPasswordChangeRequired())
             .permissionsVersion(user.getPermissionsVersion())
             .createdAt(user.getCreatedAt())
-            .lastLoginAt(user.getLastLoginAt())
-            .build();
+            .lastLoginAt(user.getLastLoginAt());
+        
+        // Include branch information if assigned
+        if (user.getBranch() != null) {
+            builder.branchId(user.getBranch().getId());
+            builder.branchName(user.getBranch().getName());
+        }
+        
+        return builder.build();
     }
     
     @Transactional

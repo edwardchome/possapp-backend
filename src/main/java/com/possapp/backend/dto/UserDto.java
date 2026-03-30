@@ -30,4 +30,8 @@ public class UserDto {
     private Long permissionsVersion;
     private LocalDateTime createdAt;
     private LocalDateTime lastLoginAt;
+    
+    // Branch assignment
+    private String branchId;
+    private String branchName;
 }
