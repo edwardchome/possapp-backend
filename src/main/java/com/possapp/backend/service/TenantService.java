@@ -238,15 +238,55 @@ public class TenantService {
                 schemaName
             ));
             
-            // Create admin user with hashed password
+            // Create default main branch
+            String mainBranchId = createDefaultMainBranch(connection, schemaName);
+            log.info("Created main branch with ID: {} in schema: {}", mainBranchId, schemaName);
+            
+            // Create admin user with hashed password and assign to main branch
             String encodedPassword = passwordEncoder.encode(plainPassword);
-            createAdminUserInSchema(connection, schemaName, adminEmail, encodedPassword);
+            createAdminUserInSchema(connection, schemaName, adminEmail, encodedPassword, mainBranchId);
             
             log.info("Created admin user in schema: {}", schemaName);
             
         } catch (SQLException e) {
             log.error("Failed to create tenant schema: {}", schemaName, e);
             throw new TenantException("Failed to create tenant schema: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * ==========================================================================
+     * CREATE DEFAULT MAIN BRANCH
+     * ==========================================================================
+     * Creates the default "Main Branch" for a new tenant.
+     * Every tenant must have at least one branch, and this is created
+     * automatically during tenant registration.
+     * 
+     * The main branch:
+     * - Has is_main_branch = true
+     * - Cannot be deleted (must always have at least one branch)
+     * - Is used as default for all operations
+     * 
+     * @param connection Database connection
+     * @param schemaName Target schema name
+     * @return The ID of the created main branch
+     * @throws SQLException if insert fails
+     * ==========================================================================
+     */
+    private String createDefaultMainBranch(Connection connection, String schemaName) throws SQLException {
+        String sql = String.format(
+            "INSERT INTO %s.branches (id, name, code, is_main_branch, is_active, can_sell, created_at, updated_at) " +
+            "VALUES (gen_random_uuid(), 'Main Branch', 'MAIN', true, true, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) " +
+            "RETURNING id",
+            schemaName
+        );
+        
+        try (PreparedStatement ps = connection.prepareStatement(sql)) {
+            var rs = ps.executeQuery();
+            if (rs.next()) {
+                return rs.getString("id");
+            }
+            throw new SQLException("Failed to create main branch - no ID returned");
         }
     }
     
@@ -263,21 +303,24 @@ public class TenantService {
      * @param schemaName Target schema name
      * @param email Admin email
      * @param encodedPassword BCrypt hashed password
+     * @param branchId The main branch ID to assign the admin to
      * @throws SQLException if insert fails
      * ==========================================================================
      */
-    private void createAdminUserInSchema(Connection connection, String schemaName, String email, String encodedPassword) throws SQLException {
+    private void createAdminUserInSchema(Connection connection, String schemaName, String email, String encodedPassword, String branchId) throws SQLException {
         String sql = String.format(
-            "INSERT INTO %s.users (id, email, password, role, is_active, email_verified, password_change_required, created_at, updated_at) " +
-            "VALUES (gen_random_uuid(), ?, ?, 'ADMIN', true, true, false, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+            "INSERT INTO %s.users (id, email, password, role, is_active, email_verified, password_change_required, branch_id, created_at, updated_at) " +
+            "VALUES (gen_random_uuid(), ?, ?, 'ADMIN', true, true, false, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
             schemaName
         );
         
         try (PreparedStatement ps = connection.prepareStatement(sql)) {
             ps.setString(1, email);
             ps.setString(2, encodedPassword);
+            ps.setString(3, branchId);
             int rowsAffected = ps.executeUpdate();
-            log.info("Admin user insert affected {} rows in schema {} (email_verified=true)", rowsAffected, schemaName);
+            log.info("Admin user insert affected {} rows in schema {} (email_verified=true, branch_id={})", 
+                rowsAffected, schemaName, branchId);
         }
     }
     
@@ -296,8 +339,10 @@ public class TenantService {
      * 6. store_config - Business settings (receipt header/footer, tax rate, etc.)
      * 7. inventory_transactions - Stock additions history
      * 8. units_of_measure - Custom measurement units
+     * 9. branches - Store locations for multi-branch support
      * 
-     * Also creates indexes for performance.
+     * Also creates indexes for performance and adds branch_id columns to
+     * receipts, inventory_transactions, and users tables.
      * 
      * @param statement SQL statement object
      * @param schemaName Target schema name
@@ -486,6 +531,60 @@ public class TenantService {
                 ('Square Meter', 'm²', 'AREA', 'Area in square meters', true, 2, true)
             ON CONFLICT (symbol) DO NOTHING
             """, schemaName));
+        
+        // Branches table - for multi-location support
+        statement.executeUpdate(String.format("""
+            CREATE TABLE IF NOT EXISTS %s.branches (
+                id VARCHAR(36) PRIMARY KEY DEFAULT gen_random_uuid()::text,
+                name VARCHAR(100) NOT NULL,
+                code VARCHAR(20) UNIQUE,
+                address VARCHAR(500),
+                phone_number VARCHAR(50),
+                email VARCHAR(255),
+                is_main_branch BOOLEAN NOT NULL DEFAULT false,
+                is_active BOOLEAN NOT NULL DEFAULT true,
+                can_sell BOOLEAN NOT NULL DEFAULT true,
+                tax_id VARCHAR(100),
+                receipt_header TEXT,
+                receipt_footer TEXT,
+                manager_name VARCHAR(100),
+                operating_hours VARCHAR(500),
+                notes TEXT,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                created_by VARCHAR(36)
+            )
+            """, schemaName));
+        
+        // Create indexes for branches
+        statement.executeUpdate(String.format(
+            "CREATE INDEX IF NOT EXISTS idx_branches_active ON %s.branches(is_active)", schemaName));
+        statement.executeUpdate(String.format(
+            "CREATE INDEX IF NOT EXISTS idx_branches_main ON %s.branches(is_main_branch) WHERE is_main_branch = true", schemaName));
+        
+        // Add branch_id to existing tables for multi-location support
+        // Receipts - track which branch made the sale
+        statement.executeUpdate(String.format(
+            "ALTER TABLE %s.receipts ADD COLUMN IF NOT EXISTS branch_id VARCHAR(36) REFERENCES %s.branches(id)",
+            schemaName, schemaName));
+        
+        // Inventory transactions - track which branch received stock
+        statement.executeUpdate(String.format(
+            "ALTER TABLE %s.inventory_transactions ADD COLUMN IF NOT EXISTS branch_id VARCHAR(36) REFERENCES %s.branches(id)",
+            schemaName, schemaName));
+        
+        // Users - track which branch user primarily works at (optional)
+        statement.executeUpdate(String.format(
+            "ALTER TABLE %s.users ADD COLUMN IF NOT EXISTS branch_id VARCHAR(36) REFERENCES %s.branches(id)",
+            schemaName, schemaName));
+        
+        // Create indexes for branch relationships
+        statement.executeUpdate(String.format(
+            "CREATE INDEX IF NOT EXISTS idx_receipts_branch ON %s.receipts(branch_id)", schemaName));
+        statement.executeUpdate(String.format(
+            "CREATE INDEX IF NOT EXISTS idx_inv_trans_branch ON %s.inventory_transactions(branch_id)", schemaName));
+        statement.executeUpdate(String.format(
+            "CREATE INDEX IF NOT EXISTS idx_users_branch ON %s.users(branch_id)", schemaName));
         
         // Create indexes for better query performance
         statement.executeUpdate(String.format(

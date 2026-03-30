@@ -87,6 +87,14 @@ public class Receipt {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
     
+    /**
+     * Branch where this receipt/sale was created.
+     * Links to the branches table for multi-location support.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "branch_id")
+    private Branch branch;
+    
     // Helper method to add item
     public void addItem(ReceiptItem item) {
         items.add(item);

@@ -86,6 +86,15 @@ public class User {
     @Builder.Default
     private Long permissionsVersion = 1L;
     
+    /**
+     * Branch assignment for the user.
+     * Optional - if null, user can work at any branch.
+     * If set, user is primarily associated with this branch.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "branch_id")
+    private Branch branch;
+    
     public String getFullName() {
         if (firstName == null && lastName == null) return email;
         return String.format("%s %s", 

@@ -63,6 +63,14 @@ public class InventoryTransaction {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
     
+    /**
+     * Branch where this inventory transaction occurred.
+     * Tracks which location received/removed the stock.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "branch_id")
+    private Branch branch;
+    
     public enum TransactionType {
         STOCK_IN,      // Adding inventory
         STOCK_OUT,     // Removing inventory (adjustment)
