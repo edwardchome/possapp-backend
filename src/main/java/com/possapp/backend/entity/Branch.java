@@ -90,7 +90,7 @@ public class Branch {
      * Whether the branch is currently active
      * Inactive branches don't appear in selection lists
      */
-    @Column(nullable = false)
+    @Column(name = "is_active", nullable = false)
     @Builder.Default
     private boolean active = true;
 
