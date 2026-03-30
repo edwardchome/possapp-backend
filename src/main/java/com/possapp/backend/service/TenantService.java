@@ -21,45 +21,152 @@ import java.sql.Statement;
 import java.time.LocalDateTime;
 import java.util.Optional;
 
+/**
+ * ============================================================================
+ * TENANT SERVICE - Business/Tenant Management Business Logic
+ * ============================================================================
+ * 
+ * This service handles all business logic related to tenants (businesses).
+ * It manages the multi-tenant architecture where each business gets its own
+ * isolated database schema.
+ * 
+ * KEY RESPONSIBILITIES:
+ * 1. Tenant registration - Creates new business with full database setup
+ * 2. Schema management - Creates/isolates each tenant's data
+ * 3. Business settings - Update business information
+ * 4. Admin user creation - Creates initial admin for new tenants
+ * 
+ * MULTI-TENANT ARCHITECTURE:
+ * - Each tenant = One database schema
+ * - Schemas are completely isolated
+ * - Shared tables (tenants) in "public" schema
+ * - All business data in tenant-specific schema
+ * ============================================================================
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class TenantService {
     
+    /**
+     * Repository for tenant CRUD operations.
+     * Works with the "tenants" table in the public schema.
+     */
     private final TenantRepository tenantRepository;
+    
+    /**
+     * JdbcTemplate for low-level SQL operations.
+     * Used for schema creation (not supported by JPA/Hibernate directly).
+     */
     private final JdbcTemplate jdbcTemplate;
+    
+    /**
+     * DataSource for creating raw database connections.
+     * Needed for schema creation and admin user setup.
+     */
     private final DataSource dataSource;
+    
+    /**
+     * Password encoder for hashing admin passwords.
+     * Uses BCrypt for secure password storage.
+     */
     private final PasswordEncoder passwordEncoder;
     
+    /**
+     * ==========================================================================
+     * FIND TENANT BY SCHEMA NAME
+     * ==========================================================================
+     * Looks up a tenant by its schema name (business ID).
+     * Used during login to validate tenant exists.
+     * 
+     * @param schemaName The business ID/schema name (e.g., "green_leaf_market")
+     * @return Optional containing tenant if found
+     * ==========================================================================
+     */
     @Transactional(readOnly = true)
     public Optional<Tenant> findBySchemaName(String schemaName) {
         return tenantRepository.findBySchemaName(schemaName);
     }
     
+    /**
+     * ==========================================================================
+     * FIND TENANT BY ID
+     * ==========================================================================
+     * Looks up a tenant by its UUID.
+     * 
+     * @param id The tenant UUID
+     * @return Optional containing tenant if found
+     * ==========================================================================
+     */
     @Transactional(readOnly = true)
     public Optional<Tenant> findById(String id) {
         return tenantRepository.findById(id);
     }
     
+    /**
+     * ==========================================================================
+     * CHECK IF SCHEMA EXISTS
+     * ==========================================================================
+     * Validates if a schema name is already taken.
+     * Used during registration to prevent duplicates.
+     * 
+     * @param schemaName The schema name to check
+     * @return true if schema exists, false otherwise
+     * ==========================================================================
+     */
     @Transactional(readOnly = true)
     public boolean existsBySchemaName(String schemaName) {
         return tenantRepository.existsBySchemaName(schemaName);
     }
     
+    /**
+     * ==========================================================================
+     * CHECK IF ADMIN EMAIL EXISTS
+     * ==========================================================================
+     * Validates if an admin email is already registered.
+     * Prevents duplicate admin accounts.
+     * 
+     * @param adminEmail The email to check
+     * @return true if email exists, false otherwise
+     * ==========================================================================
+     */
     @Transactional(readOnly = true)
     public boolean existsByAdminEmail(String adminEmail) {
         return tenantRepository.existsByAdminEmail(adminEmail);
     }
     
+    /**
+     * ==========================================================================
+     * REGISTER NEW TENANT (Complete Business Setup)
+     * ==========================================================================
+     * This is the main method for creating a new business account.
+     * It performs the complete setup process:
+     * 
+     * FLOW:
+     * 1. Validate schema name format (lowercase, alphanumeric + underscore)
+     * 2. Check for duplicates (schema name, admin email)
+     * 3. Create tenant record in public.tenants table
+     * 4. Create database schema (e.g., "green_leaf_market")
+     * 5. Create all tables in the new schema (users, products, receipts, etc.)
+     * 6. Insert default data (General category, default units)
+     * 7. Create admin user with provided email/password
+     * 8. Return the created tenant DTO
+     * 
+     * @param request Registration request with company details
+     * @return TenantDto with created tenant information
+     * @throws TenantException if validation fails or setup errors occur
+     * ==========================================================================
+     */
     @Transactional
     public TenantDto registerTenant(TenantRegistrationRequest request) {
-        // Validate schema name format
+        // Step 1: Normalize and validate schema name
+        // Convert to lowercase, replace invalid chars with underscore
         String schemaName = request.getSchemaName().toLowerCase().replaceAll("[^a-z0-9_]", "_");
         if (!schemaName.matches("^[a-z][a-z0-9_]*$")) {
             throw new TenantException("Invalid schema name. Must start with letter and contain only letters, numbers, and underscores");
         }
         
-        // Check if tenant already exists
+        // Step 2: Check for duplicates
         if (tenantRepository.existsBySchemaName(schemaName)) {
             throw new TenantException("Tenant with this schema name already exists");
         }
@@ -67,7 +174,8 @@ public class TenantService {
             throw new TenantException("Tenant with this admin email already exists");
         }
         
-        // Create tenant record in public schema
+        // Step 3: Create tenant record in public schema
+        // This stores the business info and links to the schema
         Tenant tenant = Tenant.builder()
             .companyName(request.getCompanyName())
             .schemaName(schemaName)
@@ -81,33 +189,56 @@ public class TenantService {
         
         tenant = tenantRepository.save(tenant);
         
-        // Create the tenant schema, tables, and admin user
+        // Step 4-7: Create schema, tables, and admin user
+        // This is done via raw JDBC as JPA doesn't support schema creation
         createTenantSchemaAndAdmin(schemaName, request.getAdminEmail(), request.getPassword());
         
         log.info("Successfully created tenant: {} with schema: {}", request.getCompanyName(), schemaName);
         
+        // Step 8: Return DTO for response
         return mapToDto(tenant);
     }
     
+    /**
+     * ==========================================================================
+     * CREATE TENANT SCHEMA AND ADMIN USER
+     * ==========================================================================
+     * This method creates the actual database infrastructure for a new tenant:
+     * 
+     * 1. Creates PostgreSQL schema (namespace for tables)
+     * 2. Creates all necessary tables (users, products, receipts, etc.)
+     * 3. Inserts default configuration (store settings, default units)
+     * 4. Creates the admin user with the provided credentials
+     * 
+     * Uses raw JDBC because:
+     * - JPA/Hibernate can't create schemas dynamically
+     * - Need precise control over table creation
+     * - Must set up tenant-specific defaults
+     * 
+     * @param schemaName The schema name to create
+     * @param adminEmail Admin user's email
+     * @param plainPassword Admin's plain text password (will be hashed)
+     * @throws TenantException if database operations fail
+     * ==========================================================================
+     */
     private void createTenantSchemaAndAdmin(String schemaName, String adminEmail, String plainPassword) {
         try (Connection connection = dataSource.getConnection();
              Statement statement = connection.createStatement()) {
             
-            // Create schema
+            // Create the schema (namespace) for this tenant
             statement.executeUpdate("CREATE SCHEMA IF NOT EXISTS " + schemaName);
             log.info("Created schema: {}", schemaName);
             
-            // Create tables in the tenant schema
+            // Create all tables within this schema
             createTenantTables(statement, schemaName);
             
-            // Insert default store config
+            // Insert default store configuration
             statement.executeUpdate(String.format(
                 "INSERT INTO %s.store_config (store_name, currency_code, currency_symbol) VALUES ('My Store', 'USD', '$')",
                 schemaName
             ));
             
-            // Create admin user directly using JDBC to ensure correct schema
-            // Note: email_verified is set to FALSE - user must verify email
+            // Create admin user with hashed password
             String encodedPassword = passwordEncoder.encode(plainPassword);
             createAdminUserInSchema(connection, schemaName, adminEmail, encodedPassword);
             
@@ -119,6 +250,22 @@ public class TenantService {
         }
     }
     
+    /**
+     * ==========================================================================
+     * CREATE ADMIN USER IN TENANT SCHEMA
+     * ==========================================================================
+     * Inserts the admin user directly into the tenant's users table.
+     * 
+     * Note: email_verified is set to TRUE here because the registration
+     * process already verified the email via the verification link.
+     * 
+     * @param connection Database connection
+     * @param schemaName Target schema name
+     * @param email Admin email
+     * @param encodedPassword BCrypt hashed password
+     * @throws SQLException if insert fails
+     * ==========================================================================
+     */
     private void createAdminUserInSchema(Connection connection, String schemaName, String email, String encodedPassword) throws SQLException {
         String sql = String.format(
             "INSERT INTO %s.users (id, email, password, role, is_active, email_verified, password_change_required, created_at, updated_at) " +
@@ -134,8 +281,31 @@ public class TenantService {
         }
     }
     
+    /**
+     * ==========================================================================
+     * CREATE TENANT TABLES
+     * ==========================================================================
+     * Creates all database tables for a new tenant.
+     * 
+     * TABLES CREATED:
+     * 1. users - Staff/users of the business
+     * 2. categories - Product categories
+     * 3. products - Product catalog with unit of measure support
+     * 4. receipts - Sales receipts/transactions
+     * 5. receipt_items - Individual items in each receipt
+     * 6. store_config - Business settings (receipt header/footer, tax rate, etc.)
+     * 7. inventory_transactions - Stock additions history
+     * 8. units_of_measure - Custom measurement units
+     * 
+     * Also creates indexes for performance.
+     * 
+     * @param statement SQL statement object
+     * @param schemaName Target schema name
+     * @throws SQLException if table creation fails
+     * ==========================================================================
+     */
     private void createTenantTables(Statement statement, String schemaName) throws SQLException {
-        // Users table
+        // Users table - stores staff/users for this business
         statement.executeUpdate(String.format("""
             CREATE TABLE IF NOT EXISTS %s.users (
                 id VARCHAR(36) PRIMARY KEY DEFAULT gen_random_uuid()::text,
@@ -161,7 +331,7 @@ public class TenantService {
             )
             """, schemaName));
         
-        // Categories table
+        // Categories table - for organizing products
         statement.executeUpdate(String.format("""
             CREATE TABLE IF NOT EXISTS %s.categories (
                 id VARCHAR(36) PRIMARY KEY DEFAULT gen_random_uuid()::text,
@@ -179,7 +349,8 @@ public class TenantService {
             "INSERT INTO %s.categories (id, name, description, display_order, is_active) VALUES (gen_random_uuid(), 'General', 'Default category for products', 0, true) ON CONFLICT (name) DO NOTHING",
             schemaName));
         
-        // Products table with category reference and unit of measurement support
+        // Products table - the product catalog
+        // Supports fractional quantities (e.g., 1.5 kg of apples)
         statement.executeUpdate(String.format("""
             CREATE TABLE IF NOT EXISTS %s.products (
                 code VARCHAR(100) PRIMARY KEY,
@@ -204,7 +375,7 @@ public class TenantService {
             )
             """, schemaName, schemaName));
         
-        // Receipts table
+        // Receipts table - sales transactions
         statement.executeUpdate(String.format("""
             CREATE TABLE IF NOT EXISTS %s.receipts (
                 id VARCHAR(100) PRIMARY KEY,
@@ -229,7 +400,7 @@ public class TenantService {
             )
             """, schemaName));
         
-        // Receipt items table with fractional quantity support
+        // Receipt items table - individual items in each receipt
         statement.executeUpdate(String.format("""
             CREATE TABLE IF NOT EXISTS %s.receipt_items (
                 id VARCHAR(36) PRIMARY KEY DEFAULT gen_random_uuid()::text,
@@ -242,7 +413,7 @@ public class TenantService {
             )
             """, schemaName, schemaName));
         
-        // Store config table
+        // Store config table - business settings for receipts
         statement.executeUpdate(String.format("""
             CREATE TABLE IF NOT EXISTS %s.store_config (
                 id SERIAL PRIMARY KEY,
@@ -266,7 +437,7 @@ public class TenantService {
             )
             """, schemaName));
         
-        // Inventory transactions table with BigDecimal support
+        // Inventory transactions table - tracks stock additions
         statement.executeUpdate(String.format("""
             CREATE TABLE IF NOT EXISTS %s.inventory_transactions (
                 id VARCHAR(36) PRIMARY KEY DEFAULT gen_random_uuid()::text,
@@ -286,7 +457,7 @@ public class TenantService {
             )
             """, schemaName, schemaName));
         
-        // Units of measure table
+        // Units of measure table - custom measurement units
         statement.executeUpdate(String.format("""
             CREATE TABLE IF NOT EXISTS %s.units_of_measure (
                 id VARCHAR(36) PRIMARY KEY DEFAULT gen_random_uuid()::text,
@@ -316,7 +487,7 @@ public class TenantService {
             ON CONFLICT (symbol) DO NOTHING
             """, schemaName));
         
-        // Create indexes
+        // Create indexes for better query performance
         statement.executeUpdate(String.format(
             "CREATE INDEX IF NOT EXISTS idx_products_category ON %s.products(category_id)", schemaName));
         statement.executeUpdate(String.format(
@@ -331,6 +502,17 @@ public class TenantService {
         log.info("Created tables in schema: {}", schemaName);
     }
     
+    /**
+     * ==========================================================================
+     * DEACTIVATE TENANT (Soft Delete)
+     * ==========================================================================
+     * Deactivates a tenant by setting active=false.
+     * The tenant's data remains but they cannot log in.
+     * 
+     * @param tenantId The tenant UUID to deactivate
+     * @throws TenantException if tenant not found
+     * ==========================================================================
+     */
     @Transactional
     public void deactivateTenant(String tenantId) {
         Tenant tenant = tenantRepository.findById(tenantId)
@@ -339,6 +521,16 @@ public class TenantService {
         tenantRepository.save(tenant);
     }
     
+    /**
+     * ==========================================================================
+     * ACTIVATE TENANT
+     * ==========================================================================
+     * Reactivates a previously deactivated tenant.
+     * 
+     * @param tenantId The tenant UUID to activate
+     * @throws TenantException if tenant not found
+     * ==========================================================================
+     */
     @Transactional
     public void activateTenant(String tenantId) {
         Tenant tenant = tenantRepository.findById(tenantId)
@@ -347,6 +539,17 @@ public class TenantService {
         tenantRepository.save(tenant);
     }
     
+    /**
+     * ==========================================================================
+     * CONVERT ENTITY TO DTO
+     * ==========================================================================
+     * Converts a Tenant entity to a TenantDto for API responses.
+     * DTOs are safer to send to clients (don't expose internal fields).
+     * 
+     * @param tenant The Tenant entity
+     * @return TenantDto for response
+     * ==========================================================================
+     */
     public TenantDto mapToDto(Tenant tenant) {
         return TenantDto.builder()
             .id(tenant.getId())
@@ -362,6 +565,22 @@ public class TenantService {
             .build();
     }
     
+    /**
+     * ==========================================================================
+     * GET CURRENT TENANT (Business Settings Page)
+     * ==========================================================================
+     * Gets the current tenant based on TenantContext.
+     * TenantContext is set by TenantFilter from X-Tenant-ID header.
+     * 
+     * FLOW:
+     * 1. Mobile app sends request with X-Tenant-ID header
+     * 2. TenantFilter extracts tenant ID and sets TenantContext
+     * 3. This method reads TenantContext to get current schema
+     * 4. Looks up tenant in public.tenants table by schema name
+     * 
+     * @return TenantDto or null if not found
+     * ==========================================================================
+     */
     @Transactional(readOnly = true)
     public TenantDto getCurrentTenant() {
         String currentSchema = TenantContext.getCurrentTenant();
@@ -373,6 +592,23 @@ public class TenantService {
             .orElse(null);
     }
     
+    /**
+     * ==========================================================================
+     * UPDATE CURRENT TENANT (Save Business Settings)
+     * ==========================================================================
+     * Updates the current tenant's business information.
+     * Only updates allowed fields (companyName, contactPhone, address).
+     * 
+     * PROTECTED FIELDS (cannot change):
+     * - schemaName: Would break all existing data references
+     * - adminEmail: Requires verification process
+     * - id: Immutable identifier
+     * 
+     * @param tenantDto DTO containing updated fields
+     * @return Updated TenantDto
+     * @throws TenantException if tenant not found or update fails
+     * ==========================================================================
+     */
     @Transactional
     public TenantDto updateCurrentTenant(TenantDto tenantDto) {
         String currentSchema = TenantContext.getCurrentTenant();
