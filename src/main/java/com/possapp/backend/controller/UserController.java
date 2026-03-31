@@ -49,7 +49,7 @@ public class UserController {
         String currentTenant = TenantContext.getCurrentTenant();
         log.info("Fetching all users for tenant: {}", currentTenant);
 
-        List<User> users = userRepository.findAll();
+        List<User> users = userRepository.findAllWithBranch();
         List<UserDto> userDtos = users.stream()
             .map(this::mapToDto)
             .collect(Collectors.toList());
@@ -126,7 +126,7 @@ public class UserController {
             @Parameter(description = "User ID", required = true)
             @PathVariable String id) {
         
-        User user = userRepository.findById(id)
+        User user = userRepository.findByIdWithBranch(id)
             .orElseThrow(() -> new UserException("User not found: " + id));
 
         return ResponseEntity.ok(ApiResponse.success("User retrieved successfully", mapToDto(user)));
@@ -144,7 +144,7 @@ public class UserController {
             @Parameter(description = "Updated user details", required = true)
             @RequestBody CreateUserRequest request) {
         
-        User user = userRepository.findById(id)
+        User user = userRepository.findByIdWithBranch(id)
             .orElseThrow(() -> new UserException("User not found: " + id));
 
         // Track if role or permissions are being changed
@@ -214,7 +214,7 @@ public class UserController {
             @PathVariable String id,
             Authentication authentication) {
         
-        User user = userRepository.findById(id)
+        User user = userRepository.findByIdWithBranch(id)
             .orElseThrow(() -> new UserException("User not found: " + id));
 
         // Prevent deleting yourself
@@ -239,7 +239,7 @@ public class UserController {
             @Parameter(description = "User ID", required = true)
             @PathVariable String id) {
         
-        User user = userRepository.findById(id)
+        User user = userRepository.findByIdWithBranch(id)
             .orElseThrow(() -> new UserException("User not found: " + id));
 
         user.setActive(true);
@@ -265,7 +265,7 @@ public class UserController {
             throw new UserException("Password must be at least 6 characters");
         }
 
-        User user = userRepository.findById(id)
+        User user = userRepository.findByIdWithBranch(id)
             .orElseThrow(() -> new UserException("User not found: " + id));
 
         user.setPassword(passwordEncoder.encode(newPassword));
