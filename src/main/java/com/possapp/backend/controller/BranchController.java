@@ -3,7 +3,6 @@ package com.possapp.backend.controller;
 import com.possapp.backend.dto.ApiResponse;
 import com.possapp.backend.dto.BranchDto;
 import com.possapp.backend.dto.CreateBranchRequest;
-import com.possapp.backend.entity.User;
 import com.possapp.backend.service.BranchService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -12,7 +11,8 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -129,10 +129,24 @@ public class BranchController {
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Create new branch", description = "Creates a new store branch")
     public ResponseEntity<ApiResponse<BranchDto>> createBranch(
-            @Valid @RequestBody CreateBranchRequest request,
-            @AuthenticationPrincipal User user) {
-        BranchDto branch = branchService.createBranch(request, user.getId());
+            @Valid @RequestBody CreateBranchRequest request) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String userId = extractUserIdFromAuthentication(authentication);
+        BranchDto branch = branchService.createBranch(request, userId);
         return ResponseEntity.ok(ApiResponse.success("Branch created successfully", branch));
+    }
+    
+    /**
+     * Extract user ID from authentication context.
+     * For now, returns the username (email) as the identifier.
+     * The created_by field is informational.
+     */
+    private String extractUserIdFromAuthentication(Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return "system";
+        }
+        // The principal is the username (email) from UserDetails
+        return authentication.getName();
     }
 
     /**
