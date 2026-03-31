@@ -17,14 +17,28 @@ public interface ReceiptRepository extends JpaRepository<Receipt, String> {
     
     Optional<Receipt> findByIdAndVoidedFalse(String id);
     
+    @Query("SELECT r FROM Receipt r LEFT JOIN FETCH r.branch WHERE r.id = :id AND r.voided = false")
+    Optional<Receipt> findByIdAndVoidedFalseWithBranch(@Param("id") String id);
+    
     Page<Receipt> findAllByVoidedFalseOrderByTimestampDesc(Pageable pageable);
     
     List<Receipt> findAllByVoidedFalseOrderByTimestampDesc();
+    
+    @Query("SELECT r FROM Receipt r LEFT JOIN FETCH r.branch WHERE r.voided = false ORDER BY r.timestamp DESC")
+    List<Receipt> findAllByVoidedFalseOrderByTimestampDescWithBranch();
     
     @Query("SELECT r FROM Receipt r WHERE r.voided = false AND " +
            "r.timestamp BETWEEN :startDate AND :endDate " +
            "ORDER BY r.timestamp DESC")
     List<Receipt> findByDateRange(
+        @Param("startDate") LocalDateTime startDate,
+        @Param("endDate") LocalDateTime endDate
+    );
+    
+    @Query("SELECT r FROM Receipt r LEFT JOIN FETCH r.branch WHERE r.voided = false AND " +
+           "r.timestamp BETWEEN :startDate AND :endDate " +
+           "ORDER BY r.timestamp DESC")
+    List<Receipt> findByDateRangeWithBranch(
         @Param("startDate") LocalDateTime startDate,
         @Param("endDate") LocalDateTime endDate
     );

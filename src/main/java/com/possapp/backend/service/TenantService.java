@@ -578,6 +578,16 @@ public class TenantService {
             "ALTER TABLE %s.users ADD COLUMN IF NOT EXISTS branch_id VARCHAR(36) REFERENCES %s.branches(id)",
             schemaName, schemaName));
         
+        // Users - track currently active branch for the user
+        statement.executeUpdate(String.format(
+            "ALTER TABLE %s.users ADD COLUMN IF NOT EXISTS active_branch_id VARCHAR(36) REFERENCES %s.branches(id)",
+            schemaName, schemaName));
+        
+        // Products - track which branch the product belongs to (optional - null means shared across branches)
+        statement.executeUpdate(String.format(
+            "ALTER TABLE %s.products ADD COLUMN IF NOT EXISTS branch_id VARCHAR(36) REFERENCES %s.branches(id)",
+            schemaName, schemaName));
+        
         // Create indexes for branch relationships
         statement.executeUpdate(String.format(
             "CREATE INDEX IF NOT EXISTS idx_receipts_branch ON %s.receipts(branch_id)", schemaName));
@@ -585,6 +595,10 @@ public class TenantService {
             "CREATE INDEX IF NOT EXISTS idx_inv_trans_branch ON %s.inventory_transactions(branch_id)", schemaName));
         statement.executeUpdate(String.format(
             "CREATE INDEX IF NOT EXISTS idx_users_branch ON %s.users(branch_id)", schemaName));
+        statement.executeUpdate(String.format(
+            "CREATE INDEX IF NOT EXISTS idx_users_active_branch ON %s.users(active_branch_id)", schemaName));
+        statement.executeUpdate(String.format(
+            "CREATE INDEX IF NOT EXISTS idx_products_branch ON %s.products(branch_id)", schemaName));
         
         // Create indexes for better query performance
         statement.executeUpdate(String.format(

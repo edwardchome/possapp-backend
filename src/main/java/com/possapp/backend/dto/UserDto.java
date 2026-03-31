@@ -34,4 +34,8 @@ public class UserDto {
     // Branch assignment
     private String branchId;
     private String branchName;
+    
+    // Active branch (for users with multiple branch access)
+    private String activeBranchId;
+    private String activeBranchName;
 }

@@ -1,14 +1,19 @@
 package com.possapp.backend.service;
 
+import com.possapp.backend.dto.BranchDto;
 import com.possapp.backend.dto.CreateSaleRequest;
 import com.possapp.backend.dto.ReceiptDto;
 import com.possapp.backend.dto.ReceiptItemDto;
+import com.possapp.backend.entity.Branch;
 import com.possapp.backend.entity.Product;
 import com.possapp.backend.entity.Receipt;
 import com.possapp.backend.entity.ReceiptItem;
+import com.possapp.backend.entity.User;
 import com.possapp.backend.exception.ReceiptException;
+import com.possapp.backend.repository.BranchRepository;
 import com.possapp.backend.repository.ProductRepository;
 import com.possapp.backend.repository.ReceiptRepository;
+import com.possapp.backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -32,10 +37,12 @@ public class ReceiptService {
     private final ProductRepository productRepository;
     private final StoreConfigService storeConfigService;
     private final UserService userService;
+    private final UserRepository userRepository;
+    private final BranchRepository branchRepository;
     
     @Transactional(readOnly = true)
     public List<ReceiptDto> getAllReceipts() {
-        return receiptRepository.findAllByVoidedFalseOrderByTimestampDesc()
+        return receiptRepository.findAllByVoidedFalseOrderByTimestampDescWithBranch()
             .stream()
             .map(this::mapToDto)
             .collect(Collectors.toList());
@@ -49,7 +56,7 @@ public class ReceiptService {
     
     @Transactional(readOnly = true)
     public ReceiptDto getReceiptById(String id) {
-        Receipt receipt = receiptRepository.findByIdAndVoidedFalse(id)
+        Receipt receipt = receiptRepository.findByIdAndVoidedFalseWithBranch(id)
             .orElseThrow(() -> new ReceiptException("Receipt not found: " + id));
         return mapToDto(receipt);
     }
@@ -92,11 +99,24 @@ public class ReceiptService {
             .discount(request.getDiscount() != null ? request.getDiscount() : BigDecimal.ZERO)
             .build();
         
-        // Get current user info
-        var currentUser = userService.getCurrentUser();
-        if (currentUser != null) {
-            receipt.setCashierId(currentUser.getId());
-            receipt.setCashierName(currentUser.getFullName());
+        // Get current user info and set branch
+        var currentUserDto = userService.getCurrentUser();
+        if (currentUserDto != null) {
+            receipt.setCashierId(currentUserDto.getId());
+            receipt.setCashierName(currentUserDto.getFullName());
+            
+            // Get the full user entity to access branch relationships
+            User currentUser = userRepository.findByEmailWithBranch(currentUserDto.getEmail())
+                .orElse(null);
+            
+            // Set branch from user's active branch
+            if (currentUser != null) {
+                if (currentUser.getActiveBranch() != null) {
+                    receipt.setBranch(currentUser.getActiveBranch());
+                } else if (currentUser.getBranch() != null) {
+                    receipt.setBranch(currentUser.getBranch());
+                }
+            }
         }
         
         // Process items and update stock
@@ -162,7 +182,7 @@ public class ReceiptService {
     
     @Transactional(readOnly = true)
     public List<ReceiptDto> getReceiptsByDateRange(LocalDateTime startDate, LocalDateTime endDate) {
-        return receiptRepository.findByDateRange(startDate, endDate)
+        return receiptRepository.findByDateRangeWithBranch(startDate, endDate)
             .stream()
             .map(this::mapToDto)
             .collect(Collectors.toList());
@@ -190,6 +210,15 @@ public class ReceiptService {
     }
     
     public ReceiptDto mapToDto(Receipt receipt) {
+        BranchDto branchDto = null;
+        if (receipt.getBranch() != null) {
+            branchDto = BranchDto.builder()
+                .id(receipt.getBranch().getId())
+                .name(receipt.getBranch().getName())
+                .code(receipt.getBranch().getCode())
+                .build();
+        }
+        
         return ReceiptDto.builder()
             .id(receipt.getId())
             .timestamp(receipt.getTimestamp())
@@ -213,6 +242,7 @@ public class ReceiptService {
             .voidReason(receipt.getVoidReason())
             .createdAt(receipt.getCreatedAt())
             .itemCount(receipt.getItems().size())
+            .branch(branchDto)
             .build();
     }
     

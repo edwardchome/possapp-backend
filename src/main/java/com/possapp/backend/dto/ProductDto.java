@@ -37,4 +37,7 @@ public class ProductDto {
     private Boolean allowDecimal;
     private BigDecimal minQuantity;
     private BigDecimal stepQuantity;
+    
+    // Branch assignment
+    private BranchDto branch;
 }

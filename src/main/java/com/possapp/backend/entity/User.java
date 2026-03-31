@@ -95,6 +95,16 @@ public class User {
     @JoinColumn(name = "branch_id")
     private Branch branch;
     
+    /**
+     * Currently active branch for the user.
+     * This is the branch the user is currently working in.
+     * All operations (sales, inventory) are scoped to this branch.
+     * If null and user has a branch assignment, defaults to branch.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "active_branch_id")
+    private Branch activeBranch;
+    
     public String getFullName() {
         if (firstName == null && lastName == null) return email;
         return String.format("%s %s", 

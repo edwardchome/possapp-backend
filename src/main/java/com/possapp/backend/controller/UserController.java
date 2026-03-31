@@ -112,8 +112,12 @@ public class UserController {
             log.error("Failed to send welcome email to: {}", request.getEmail(), e);
             // Don't fail user creation if email fails
         }
+        
+        // Reload user with branch data to avoid LazyInitializationException
+        User createdUser = userRepository.findByIdWithBranch(user.getId())
+            .orElse(user);
 
-        return ResponseEntity.ok(ApiResponse.success("User created successfully. Welcome email sent.", mapToDto(user)));
+        return ResponseEntity.ok(ApiResponse.success("User created successfully. Welcome email sent.", mapToDto(createdUser)));
     }
 
     @GetMapping("/{id}")
@@ -197,10 +201,14 @@ public class UserController {
 
         user = userRepository.save(user);
         log.info("User updated: {}", user.getEmail());
+        
+        // Reload user with branch data to avoid LazyInitializationException
+        User updatedUser = userRepository.findByIdWithBranch(user.getId())
+            .orElse(user);
 
         return ResponseEntity.ok(ApiResponse.success("User updated successfully" + 
             (permissionsChanged ? ". User's session has been invalidated due to permission changes." : ""), 
-            mapToDto(user)));
+            mapToDto(updatedUser)));
     }
 
     @DeleteMapping("/{id}")
@@ -245,8 +253,12 @@ public class UserController {
         user.setActive(true);
         user = userRepository.save(user);
         log.info("User activated: {}", user.getEmail());
+        
+        // Reload user with branch data to avoid LazyInitializationException
+        User updatedUser = userRepository.findByIdWithBranch(user.getId())
+            .orElse(user);
 
-        return ResponseEntity.ok(ApiResponse.success("User activated successfully", mapToDto(user)));
+        return ResponseEntity.ok(ApiResponse.success("User activated successfully", mapToDto(updatedUser)));
     }
 
     @PostMapping("/{id}/reset-password")
@@ -274,6 +286,50 @@ public class UserController {
 
         return ResponseEntity.ok(ApiResponse.success("Password reset successfully", null));
     }
+    
+    @PostMapping("/me/active-branch")
+    @Operation(
+        summary = "Set active branch for current user",
+        description = "Update the currently logged-in user's active branch for the session"
+    )
+    public ResponseEntity<ApiResponse<UserDto>> setActiveBranch(
+            @Parameter(description = "Branch ID to set as active", required = true)
+            @RequestBody SetActiveBranchRequest request,
+            Authentication authentication) {
+        
+        String email = authentication.getName();
+        log.info("Setting active branch for user: {} to branch: {}", email, request.getBranchId());
+        
+        User user = userRepository.findByEmail(email)
+            .orElseThrow(() -> new UserException("User not found"));
+        
+        // Validate the branch exists and is active
+        Branch branch = branchRepository.findById(request.getBranchId())
+            .orElseThrow(() -> new UserException("Branch not found: " + request.getBranchId()));
+        
+        if (!branch.isActive()) {
+            throw new UserException("Branch is not active: " + branch.getName());
+        }
+        
+        // Check if user is allowed to use this branch
+        // If user has a specific branch assignment, they can only switch to that branch
+        // If user has no branch assignment (null), they can switch to any branch
+        if (user.getBranch() != null && !user.getBranch().getId().equals(request.getBranchId())) {
+            throw new UserException("You are not assigned to this branch");
+        }
+        
+        user.setActiveBranch(branch);
+        user = userRepository.save(user);
+        
+        log.info("Active branch set for user: {} to branch: {}", email, branch.getName());
+        return ResponseEntity.ok(ApiResponse.success("Active branch updated", mapToDto(user)));
+    }
+    
+    // Request DTO for setting active branch
+    @lombok.Data
+    public static class SetActiveBranchRequest {
+        private String branchId;
+    }
 
     private UserDto mapToDto(User user) {
         UserDto.UserDtoBuilder builder = UserDto.builder()
@@ -298,6 +354,12 @@ public class UserController {
         if (user.getBranch() != null) {
             builder.branchId(user.getBranch().getId());
             builder.branchName(user.getBranch().getName());
+        }
+        
+        // Include active branch info
+        if (user.getActiveBranch() != null) {
+            builder.activeBranchId(user.getActiveBranch().getId());
+            builder.activeBranchName(user.getActiveBranch().getName());
         }
         
         return builder.build();

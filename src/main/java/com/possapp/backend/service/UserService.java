@@ -243,6 +243,12 @@ public class UserService implements UserDetailsService {
             builder.branchName(user.getBranch().getName());
         }
         
+        // Include active branch information
+        if (user.getActiveBranch() != null) {
+            builder.activeBranchId(user.getActiveBranch().getId());
+            builder.activeBranchName(user.getActiveBranch().getName());
+        }
+        
         return builder.build();
     }
     

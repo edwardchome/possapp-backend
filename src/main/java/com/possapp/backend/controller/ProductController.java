@@ -3,7 +3,9 @@ package com.possapp.backend.controller;
 import com.possapp.backend.dto.ApiResponse;
 import com.possapp.backend.dto.CreateProductRequest;
 import com.possapp.backend.dto.ProductDto;
+import com.possapp.backend.dto.UserDto;
 import com.possapp.backend.service.ProductService;
+import com.possapp.backend.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -27,14 +29,31 @@ import java.util.Map;
 public class ProductController {
     
     private final ProductService productService;
+    private final UserService userService;
     
     @GetMapping
     @Operation(
         summary = "Get all products",
-        description = "Retrieve all products in the current tenant"
+        description = "Retrieve all products in the current tenant. Filtered by user's active branch if set."
     )
     public ResponseEntity<ApiResponse<List<ProductDto>>> getAllProducts() {
-        List<ProductDto> products = productService.getAllProducts();
+        // Get current user's active branch for filtering
+        UserDto currentUser = userService.getCurrentUser();
+        String activeBranchId = null;
+        if (currentUser != null) {
+            activeBranchId = currentUser.getActiveBranchId() != null 
+                ? currentUser.getActiveBranchId() 
+                : currentUser.getBranchId();
+        }
+        
+        List<ProductDto> products;
+        if (activeBranchId != null) {
+            // Filter products by user's active branch
+            products = productService.getAllProductsByBranch(activeBranchId);
+        } else {
+            // No branch filter - get all products
+            products = productService.getAllProducts();
+        }
         return ResponseEntity.ok(ApiResponse.success(products));
     }
     
@@ -124,12 +143,28 @@ public class ProductController {
     @GetMapping("/search")
     @Operation(
         summary = "Search products",
-        description = "Search products by name or description"
+        description = "Search products by name or description. Filtered by user's active branch if set."
     )
     public ResponseEntity<ApiResponse<List<ProductDto>>> searchProducts(
             @Parameter(description = "Search query", required = true, example = "coffee")
             @RequestParam String query) {
-        List<ProductDto> products = productService.searchProducts(query);
+        // Get current user's active branch for filtering
+        UserDto currentUser = userService.getCurrentUser();
+        String activeBranchId = null;
+        if (currentUser != null) {
+            activeBranchId = currentUser.getActiveBranchId() != null 
+                ? currentUser.getActiveBranchId() 
+                : currentUser.getBranchId();
+        }
+        
+        List<ProductDto> products;
+        if (activeBranchId != null) {
+            // Filter search by user's active branch
+            products = productService.searchProductsByBranch(query, activeBranchId);
+        } else {
+            // No branch filter - search all products
+            products = productService.searchProducts(query);
+        }
         return ResponseEntity.ok(ApiResponse.success(products));
     }
     

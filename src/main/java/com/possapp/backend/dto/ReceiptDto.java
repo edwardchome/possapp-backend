@@ -37,4 +37,5 @@ public class ReceiptDto {
     private String voidReason;
     private LocalDateTime createdAt;
     private int itemCount;
+    private BranchDto branch;
 }

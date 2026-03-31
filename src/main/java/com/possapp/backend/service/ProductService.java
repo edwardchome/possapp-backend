@@ -1,10 +1,13 @@
 package com.possapp.backend.service;
 
+import com.possapp.backend.dto.BranchDto;
 import com.possapp.backend.dto.CreateProductRequest;
 import com.possapp.backend.dto.ProductDto;
+import com.possapp.backend.entity.Branch;
 import com.possapp.backend.entity.Category;
 import com.possapp.backend.entity.Product;
 import com.possapp.backend.exception.ProductException;
+import com.possapp.backend.repository.BranchRepository;
 import com.possapp.backend.repository.CategoryRepository;
 import com.possapp.backend.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
@@ -23,10 +26,20 @@ public class ProductService {
     
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
+    private final UserService userService;
+    private final BranchRepository branchRepository;
     
     @Transactional(readOnly = true)
     public List<ProductDto> getAllProducts() {
         return productRepository.findAllByActiveTrueOrderByNameAsc()
+            .stream()
+            .map(this::mapToDto)
+            .collect(Collectors.toList());
+    }
+    
+    @Transactional(readOnly = true)
+    public List<ProductDto> getAllProductsByBranch(String branchId) {
+        return productRepository.findAllByActiveTrueAndBranchIdOrderByNameAsc(branchId)
             .stream()
             .map(this::mapToDto)
             .collect(Collectors.toList());
@@ -64,6 +77,20 @@ public class ProductService {
                 .orElse(null);
         }
         
+        // Get current user's branch for product assignment
+        Branch productBranch = null;
+        var currentUser = userService.getCurrentUser();
+        if (currentUser != null) {
+            // Use active branch if set, otherwise use primary branch
+            String branchId = currentUser.getActiveBranchId() != null 
+                ? currentUser.getActiveBranchId() 
+                : currentUser.getBranchId();
+            
+            if (branchId != null) {
+                productBranch = branchRepository.findById(branchId).orElse(null);
+            }
+        }
+        
         Product product = Product.builder()
             .code(request.getCode())
             .name(request.getName())
@@ -81,10 +108,13 @@ public class ProductService {
             .minQuantity(request.getMinQuantity() != null ? request.getMinQuantity() : BigDecimal.ONE)
             .stepQuantity(request.getStepQuantity() != null ? request.getStepQuantity() : BigDecimal.ONE)
             .active(true)
+            .branch(productBranch)
             .build();
         
         product = productRepository.save(product);
-        log.info("Created product: {} with unit: {}", product.getCode(), product.getUnitOfMeasure());
+        log.info("Created product: {} with unit: {} and branch: {}", 
+            product.getCode(), product.getUnitOfMeasure(), 
+            productBranch != null ? productBranch.getName() : "none");
         return mapToDto(product);
     }
     
@@ -173,6 +203,14 @@ public class ProductService {
     }
     
     @Transactional(readOnly = true)
+    public List<ProductDto> searchProductsByBranch(String query, String branchId) {
+        return productRepository.searchProductsByBranchId(query, branchId)
+            .stream()
+            .map(this::mapToDto)
+            .collect(Collectors.toList());
+    }
+    
+    @Transactional(readOnly = true)
     public List<String> getAllCategories() {
         return productRepository.findAllCategories();
     }
@@ -219,6 +257,15 @@ public class ProductService {
                    .categoryName(product.getCategory().getName());
         } else {
             builder.categoryName("General");
+        }
+        
+        // Add branch info if present
+        if (product.getBranch() != null) {
+            builder.branch(BranchDto.builder()
+                .id(product.getBranch().getId())
+                .name(product.getBranch().getName())
+                .code(product.getBranch().getCode())
+                .build());
         }
         
         return builder.build();

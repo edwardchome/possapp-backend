@@ -53,6 +53,10 @@ public class Product {
     @JoinColumn(name = "category_id")
     private Category category;
     
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "branch_id")
+    private Branch branch;
+    
     @Column(length = 2000)
     private String description;
     
