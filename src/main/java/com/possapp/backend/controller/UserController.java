@@ -21,6 +21,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -139,7 +140,7 @@ public class UserController {
     @PutMapping("/{id}")
     @Operation(
         summary = "Update user",
-        description = "Update user details (Admin only). Changing role or permissions will invalidate user's session."
+        description = "Update user details (Admin only). Changing role, permissions, or branch assignment will invalidate user's session."
     )
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<ApiResponse<UserDto>> updateUser(
@@ -151,13 +152,20 @@ public class UserController {
         User user = userRepository.findByIdWithBranch(id)
             .orElseThrow(() -> new UserException("User not found: " + id));
 
-        // Track if role or permissions are being changed
+        // Track if role, permissions, or branch assignment are being changed
         boolean roleChanged = request.getRole() != null && !request.getRole().equals(user.getRole());
         boolean productsPermissionChanged = request.getCanManageProducts() != null && 
                                             request.getCanManageProducts() != user.isCanManageProducts();
         boolean inventoryPermissionChanged = request.getCanManageInventory() != null && 
                                              request.getCanManageInventory() != user.isCanManageInventory();
-        boolean permissionsChanged = roleChanged || productsPermissionChanged || inventoryPermissionChanged;
+        
+        // Track branch assignment changes
+        String currentBranchId = user.getBranch() != null ? user.getBranch().getId() : null;
+        String newBranchId = request.getBranchId();
+        boolean branchChanged = newBranchId != null && !newBranchId.equals(currentBranchId != null ? currentBranchId : "");
+        boolean branchRemoved = newBranchId != null && newBranchId.isEmpty() && currentBranchId != null;
+        
+        boolean permissionsChanged = roleChanged || productsPermissionChanged || inventoryPermissionChanged || branchChanged || branchRemoved;
 
         // Update fields
         if (request.getFirstName() != null) {
@@ -180,23 +188,28 @@ public class UserController {
         }
         
         // Update branch assignment if provided
+        Branch newBranch = null;
         if (request.getBranchId() != null) {
             if (request.getBranchId().isEmpty()) {
                 // Empty string means remove branch assignment
                 user.setBranch(null);
+                user.setActiveBranch(null); // Also clear active branch
             } else {
-                Branch branch = branchRepository.findById(request.getBranchId())
+                newBranch = branchRepository.findById(request.getBranchId())
                     .orElseThrow(() -> new UserException("Branch not found: " + request.getBranchId()));
-                user.setBranch(branch);
+                user.setBranch(newBranch);
+                // Also update activeBranch to the new branch so user sees the new branch's data immediately
+                user.setActiveBranch(newBranch);
             }
         }
 
-        // Increment permissions version if role or permissions changed
+        // Increment permissions version if role, permissions, or branch changed
         // This will force the user to logout and login again
         if (permissionsChanged) {
             user.setPermissionsVersion(user.getPermissionsVersion() + 1);
-            log.info("User permissions changed for: {}. New version: {}. User will be forced to logout.", 
-                     user.getEmail(), user.getPermissionsVersion());
+            String changeType = branchChanged || branchRemoved ? "branch assignment" : "permissions";
+            log.info("User {} changed for: {}. New version: {}. User will be forced to logout.", 
+                     changeType, user.getEmail(), user.getPermissionsVersion());
         }
 
         user = userRepository.save(user);
@@ -206,8 +219,16 @@ public class UserController {
         User updatedUser = userRepository.findByIdWithBranch(user.getId())
             .orElse(user);
 
-        return ResponseEntity.ok(ApiResponse.success("User updated successfully" + 
-            (permissionsChanged ? ". User's session has been invalidated due to permission changes." : ""), 
+        String changeReason = "";
+        if (permissionsChanged) {
+            if (branchChanged || branchRemoved) {
+                changeReason = ". User's session has been invalidated due to branch assignment changes.";
+            } else {
+                changeReason = ". User's session has been invalidated due to permission changes.";
+            }
+        }
+        
+        return ResponseEntity.ok(ApiResponse.success("User updated successfully" + changeReason, 
             mapToDto(updatedUser)));
     }
 
@@ -292,6 +313,7 @@ public class UserController {
         summary = "Set active branch for current user",
         description = "Update the currently logged-in user's active branch for the session"
     )
+    @Transactional
     public ResponseEntity<ApiResponse<UserDto>> setActiveBranch(
             @Parameter(description = "Branch ID to set as active", required = true)
             @RequestBody SetActiveBranchRequest request,
@@ -312,17 +334,26 @@ public class UserController {
         }
         
         // Check if user is allowed to use this branch
-        // If user has a specific branch assignment, they can only switch to that branch
-        // If user has no branch assignment (null), they can switch to any branch
-        if (user.getBranch() != null && !user.getBranch().getId().equals(request.getBranchId())) {
+        // Admins and Managers can switch to any branch
+        // Regular users with a specific branch assignment can only switch to that branch
+        // Users with no branch assignment (null) can switch to any branch
+        boolean isAdminOrManager = user.getRole() != null && 
+            (user.getRole().equals("ADMIN") || user.getRole().equals("MANAGER"));
+        
+        if (!isAdminOrManager && user.getBranch() != null && 
+            !user.getBranch().getId().equals(request.getBranchId())) {
             throw new UserException("You are not assigned to this branch");
         }
         
         user.setActiveBranch(branch);
         user = userRepository.save(user);
         
+        // Reload user with branch data eagerly loaded to avoid LazyInitializationException
+        User updatedUser = userRepository.findByIdWithBranch(user.getId())
+            .orElse(user);
+        
         log.info("Active branch set for user: {} to branch: {}", email, branch.getName());
-        return ResponseEntity.ok(ApiResponse.success("Active branch updated", mapToDto(user)));
+        return ResponseEntity.ok(ApiResponse.success("Active branch updated", mapToDto(updatedUser)));
     }
     
     // Request DTO for setting active branch

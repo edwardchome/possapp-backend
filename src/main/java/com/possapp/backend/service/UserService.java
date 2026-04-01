@@ -112,14 +112,15 @@ public class UserService implements UserDetailsService {
         }
         
         String email = authentication.getName();
-        return userRepository.findByEmail(email)
+        return userRepository.findByEmailWithBranch(email)
             .map(this::mapToDto)
             .orElse(null);
     }
     
     @Transactional(readOnly = true)
     public UserDto getUserProfile(String email) {
-        User user = findByEmail(email);
+        User user = userRepository.findByEmailWithBranch(email)
+            .orElseThrow(() -> new UserException("User not found"));
         return mapToDto(user);
     }
     

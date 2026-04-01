@@ -33,10 +33,26 @@ public class ReceiptController {
     @GetMapping("/receipts")
     @Operation(
         summary = "Get all receipts",
-        description = "Retrieve all receipts in the current tenant"
+        description = "Retrieve all receipts in the current tenant. Optional date range and branch filtering."
     )
-    public ResponseEntity<ApiResponse<List<ReceiptDto>>> getAllReceipts() {
-        List<ReceiptDto> receipts = receiptService.getAllReceipts();
+    public ResponseEntity<ApiResponse<List<ReceiptDto>>> getAllReceipts(
+            @Parameter(description = "Start date (ISO format)", required = false)
+            @RequestParam(required = false) String startDate,
+            @Parameter(description = "End date (ISO format)", required = false)
+            @RequestParam(required = false) String endDate,
+            @Parameter(description = "Branch ID to filter by", required = false)
+            @RequestParam(required = false) String branchId) {
+        
+        List<ReceiptDto> receipts;
+        if (startDate != null && endDate != null) {
+            LocalDateTime start = LocalDateTime.parse(startDate);
+            LocalDateTime end = LocalDateTime.parse(endDate);
+            receipts = receiptService.getReceiptsByDateRange(start, end, branchId);
+        } else if (branchId != null) {
+            receipts = receiptService.getReceiptsByBranch(branchId);
+        } else {
+            receipts = receiptService.getAllReceipts();
+        }
         return ResponseEntity.ok(ApiResponse.success(receipts));
     }
     
@@ -108,16 +124,18 @@ public class ReceiptController {
     @GetMapping("/receipts/date-range")
     @Operation(
         summary = "Get receipts by date range",
-        description = "Retrieve receipts within a specific date range"
+        description = "Retrieve receipts within a specific date range. Optional branch filter for admins."
     )
     public ResponseEntity<ApiResponse<List<ReceiptDto>>> getReceiptsByDateRange(
             @Parameter(description = "Start date (ISO format)", required = true, example = "2024-01-01T00:00:00")
             @RequestParam String startDate,
             @Parameter(description = "End date (ISO format)", required = true, example = "2024-12-31T23:59:59")
-            @RequestParam String endDate) {
+            @RequestParam String endDate,
+            @Parameter(description = "Branch ID to filter by (optional)", required = false)
+            @RequestParam(required = false) String branchId) {
         LocalDateTime start = LocalDateTime.parse(startDate);
         LocalDateTime end = LocalDateTime.parse(endDate);
-        List<ReceiptDto> receipts = receiptService.getReceiptsByDateRange(start, end);
+        List<ReceiptDto> receipts = receiptService.getReceiptsByDateRange(start, end, branchId);
         return ResponseEntity.ok(ApiResponse.success(receipts));
     }
     

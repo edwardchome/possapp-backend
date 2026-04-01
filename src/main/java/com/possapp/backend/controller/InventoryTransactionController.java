@@ -81,18 +81,20 @@ public class InventoryTransactionController {
     @GetMapping("/transactions/date-range")
     @Operation(
         summary = "Get transactions by date range",
-        description = "Retrieve inventory transactions within a date range"
+        description = "Retrieve inventory transactions within a date range. Optional branch filter for admins."
     )
     public ResponseEntity<ApiResponse<List<InventoryTransactionDto>>> getTransactionsByDateRange(
             @Parameter(description = "Start date (yyyy-MM-dd)", example = "2024-01-01")
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @Parameter(description = "End date (yyyy-MM-dd)", example = "2024-12-31")
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @Parameter(description = "Branch ID to filter by (optional)", required = false)
+            @RequestParam(required = false) String branchId) {
         
         LocalDateTime start = startDate.atStartOfDay();
         LocalDateTime end = endDate.atTime(LocalTime.MAX);
         
-        List<InventoryTransactionDto> transactions = inventoryService.getTransactionsByDateRange(start, end);
+        List<InventoryTransactionDto> transactions = inventoryService.getTransactionsByDateRange(start, end, branchId);
         return ResponseEntity.ok(ApiResponse.success(transactions));
     }
 }

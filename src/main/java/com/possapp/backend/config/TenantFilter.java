@@ -28,6 +28,7 @@ public class TenantFilter implements Filter {
         "/api/v1/auth/registration-status",
         "/api/v1/auth/forgot-password",
         "/api/v1/auth/reset-password",
+        "/api/seed",
         "/actuator/health",
         "/actuator/info",
         "/error",

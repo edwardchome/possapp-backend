@@ -19,6 +19,12 @@ public interface InventoryTransactionRepository extends JpaRepository<InventoryT
     @Query("SELECT it FROM InventoryTransaction it WHERE it.createdAt >= :startDate AND it.createdAt <= :endDate ORDER BY it.createdAt DESC")
     List<InventoryTransaction> findByDateRange(@Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
     
+    @Query("SELECT it FROM InventoryTransaction it WHERE it.createdAt >= :startDate AND it.createdAt <= :endDate AND it.branch.id = :branchId ORDER BY it.createdAt DESC")
+    List<InventoryTransaction> findByDateRangeAndBranch(@Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate, @Param("branchId") String branchId);
+    
+    @Query("SELECT it FROM InventoryTransaction it WHERE it.branch.id = :branchId ORDER BY it.createdAt DESC")
+    List<InventoryTransaction> findByBranchId(@Param("branchId") String branchId);
+    
     @Query("SELECT it FROM InventoryTransaction it WHERE it.productCode = :productCode AND it.createdAt >= :startDate AND it.createdAt <= :endDate ORDER BY it.createdAt DESC")
     List<InventoryTransaction> findByProductCodeAndDateRange(@Param("productCode") String productCode, @Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
     

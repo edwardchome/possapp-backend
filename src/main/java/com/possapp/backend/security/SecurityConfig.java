@@ -49,6 +49,7 @@ public class SecurityConfig {
                 // Public endpoints
                 .requestMatchers("/api/v1/auth/**").permitAll()
                 .requestMatchers("/api/v1/tenants/register").permitAll()
+                .requestMatchers("/api/seed").permitAll()
                 .requestMatchers("/actuator/health", "/actuator/info").permitAll()
                 .requestMatchers("/error").permitAll()
                 // Swagger/OpenAPI

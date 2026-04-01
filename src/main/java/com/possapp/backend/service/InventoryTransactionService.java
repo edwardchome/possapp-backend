@@ -84,7 +84,25 @@ public class InventoryTransactionService {
     
     @Transactional(readOnly = true)
     public List<InventoryTransactionDto> getTransactionsByDateRange(LocalDateTime startDate, LocalDateTime endDate) {
-        return transactionRepository.findByDateRange(startDate, endDate)
+        return getTransactionsByDateRange(startDate, endDate, null);
+    }
+    
+    @Transactional(readOnly = true)
+    public List<InventoryTransactionDto> getTransactionsByDateRange(LocalDateTime startDate, LocalDateTime endDate, String branchId) {
+        List<InventoryTransaction> transactions;
+        if (branchId != null && !branchId.isEmpty()) {
+            transactions = transactionRepository.findByDateRangeAndBranch(startDate, endDate, branchId);
+        } else {
+            transactions = transactionRepository.findByDateRange(startDate, endDate);
+        }
+        return transactions.stream()
+            .map(this::mapToDto)
+            .collect(Collectors.toList());
+    }
+    
+    @Transactional(readOnly = true)
+    public List<InventoryTransactionDto> getTransactionsByBranch(String branchId) {
+        return transactionRepository.findByBranchId(branchId)
             .stream()
             .map(this::mapToDto)
             .collect(Collectors.toList());

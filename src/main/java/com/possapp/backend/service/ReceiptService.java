@@ -182,8 +182,26 @@ public class ReceiptService {
     
     @Transactional(readOnly = true)
     public List<ReceiptDto> getReceiptsByDateRange(LocalDateTime startDate, LocalDateTime endDate) {
-        return receiptRepository.findByDateRangeWithBranch(startDate, endDate)
-            .stream()
+        return getReceiptsByDateRange(startDate, endDate, null);
+    }
+    
+    @Transactional(readOnly = true)
+    public List<ReceiptDto> getReceiptsByDateRange(LocalDateTime startDate, LocalDateTime endDate, String branchId) {
+        List<Receipt> receipts;
+        if (branchId != null && !branchId.isEmpty()) {
+            receipts = receiptRepository.findByDateRangeAndBranch(startDate, endDate, branchId);
+        } else {
+            receipts = receiptRepository.findByDateRangeWithBranch(startDate, endDate);
+        }
+        return receipts.stream()
+            .map(this::mapToDto)
+            .collect(Collectors.toList());
+    }
+    
+    @Transactional(readOnly = true)
+    public List<ReceiptDto> getReceiptsByBranch(String branchId) {
+        List<Receipt> receipts = receiptRepository.findByBranchId(branchId);
+        return receipts.stream()
             .map(this::mapToDto)
             .collect(Collectors.toList());
     }
