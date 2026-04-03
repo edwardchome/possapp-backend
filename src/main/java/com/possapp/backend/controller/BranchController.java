@@ -1,14 +1,18 @@
 package com.possapp.backend.controller;
 
+import com.possapp.backend.annotation.EnforceLimit;
 import com.possapp.backend.dto.ApiResponse;
 import com.possapp.backend.dto.BranchDto;
 import com.possapp.backend.dto.CreateBranchRequest;
+import com.possapp.backend.entity.LimitType;
 import com.possapp.backend.service.BranchService;
+import com.possapp.backend.service.SubscriptionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -36,11 +40,13 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/branches")
 @RequiredArgsConstructor
+@Slf4j
 @SecurityRequirement(name = "bearerAuth")
 @Tag(name = "Branch Management", description = "Manage store branches and locations")
 public class BranchController {
 
     private final BranchService branchService;
+    private final SubscriptionService subscriptionService;
 
     /**
      * ==========================================================================
@@ -127,12 +133,42 @@ public class BranchController {
      */
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
+    @EnforceLimit(LimitType.BRANCH)
     @Operation(summary = "Create new branch", description = "Creates a new store branch")
     public ResponseEntity<ApiResponse<BranchDto>> createBranch(
             @Valid @RequestBody CreateBranchRequest request) {
+        
+        // Manual subscription check (fallback if aspect fails)
+        try {
+            log.info("[MANUAL CHECK] Checking subscription limit for branch creation");
+            subscriptionService.enforceBranchLimit();
+            log.info("[MANUAL CHECK] Subscription limit check passed");
+        } catch (com.possapp.backend.exception.SubscriptionLimitExceededException e) {
+            log.error("[MANUAL CHECK] Subscription limit exceeded: {}", e.getMessage());
+            String errorMessage = buildSubscriptionErrorMessage(
+                "branch",
+                e.getCurrentUsage(),
+                e.getLimit(),
+                e.getCurrentPlan(),
+                e.getSuggestedPlan()
+            );
+            throw new RuntimeException(errorMessage);
+        } catch (Exception e) {
+            log.error("[MANUAL CHECK] Subscription check error: {}", e.getMessage());
+            throw new RuntimeException("Subscription check failed: " + e.getMessage());
+        }
+        
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String userId = extractUserIdFromAuthentication(authentication);
         BranchDto branch = branchService.createBranch(request, userId);
+        
+        // Increment branch count in subscription usage
+        try {
+            subscriptionService.incrementBranchCount();
+        } catch (Exception e) {
+            log.warn("Failed to increment branch count in subscription usage: {}", e.getMessage());
+        }
+        
         return ResponseEntity.ok(ApiResponse.success("Branch created successfully", branch));
     }
     
@@ -232,5 +268,55 @@ public class BranchController {
     public ResponseEntity<ApiResponse<BranchDto>> activateBranch(@PathVariable String id) {
         BranchDto branch = branchService.activateBranch(id);
         return ResponseEntity.ok(ApiResponse.success("Branch activated successfully", branch));
+    }
+
+    /**
+     * ==========================================================================
+     * BUILD SUBSCRIPTION ERROR MESSAGE
+     * ==========================================================================
+     * Creates a comprehensive, user-friendly error message when subscription limits
+     * are exceeded. Includes plan details, usage stats, and upgrade path.
+     * ==========================================================================
+     */
+    private String buildSubscriptionErrorMessage(
+            String resourceType,
+            int currentUsage,
+            Integer limit,
+            com.possapp.backend.entity.SubscriptionPlan currentPlan,
+            com.possapp.backend.entity.SubscriptionPlan suggestedPlan) {
+        
+        StringBuilder message = new StringBuilder();
+        
+        // Header with emoji attention grabber
+        message.append("🚫 Subscription Limit Reached\n\n");
+        
+        // Current usage details
+        message.append("📊 Current Usage:\n");
+        message.append("   • ").append(resourceType.substring(0, 1).toUpperCase())
+               .append(resourceType.substring(1)).append("s: ")
+               .append(currentUsage).append(" / ").append(limit == null ? "∞" : limit)
+               .append(" (").append(currentPlan.getDisplayName()).append(" Plan)\n\n");
+        
+        // What's included in current plan
+        message.append("✅ Your ").append(currentPlan.getDisplayName()).append(" Plan includes:\n");
+        switch (currentPlan) {
+            case STARTER -> message.append("   • 2 users, 1 branch\n   • Basic POS & Inventory\n\n");
+            case BUSINESS -> message.append("   • 5 users, 3 branches\n   • Reports & Barcode Support\n   • Multi-Branch Operations\n\n");
+            case ENTERPRISE -> message.append("   • Unlimited users & branches\n   • Advanced Analytics\n   • API Access & Integrations\n\n");
+        }
+        
+        // What's available in suggested plan
+        message.append("🚀 Upgrade to ").append(suggestedPlan.getDisplayName()).append(" for:\n");
+        switch (suggestedPlan) {
+            case BUSINESS -> message.append("   • Up to 5 users and 3 branches\n   • Sales & Inventory Reports\n   • Barcode Scanning\n   • $29.99/month\n\n");
+            case ENTERPRISE -> message.append("   • Unlimited users and branches\n   • Advanced Analytics & Insights\n   • API Access\n   • Custom Integrations\n   • $99.99/month\n\n");
+            default -> message.append("   • Contact sales for details\n\n");
+        }
+        
+        // Call to action
+        message.append("📧 To upgrade, contact: sales@possapp.com\n");
+        message.append("📞 Or call: +1 (555) 123-4567");
+        
+        return message.toString();
     }
 }

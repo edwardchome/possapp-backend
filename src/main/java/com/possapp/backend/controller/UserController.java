@@ -1,14 +1,17 @@
 package com.possapp.backend.controller;
 
+import com.possapp.backend.annotation.EnforceLimit;
 import com.possapp.backend.dto.ApiResponse;
 import com.possapp.backend.dto.CreateUserRequest;
 import com.possapp.backend.dto.UserDto;
 import com.possapp.backend.entity.Branch;
+import com.possapp.backend.entity.LimitType;
 import com.possapp.backend.entity.User;
 import com.possapp.backend.exception.UserException;
 import com.possapp.backend.repository.BranchRepository;
 import com.possapp.backend.repository.UserRepository;
 import com.possapp.backend.service.EmailService;
+import com.possapp.backend.service.SubscriptionService;
 import com.possapp.backend.tenant.TenantContext;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -39,6 +42,7 @@ public class UserController {
     private final BranchRepository branchRepository;
     private final PasswordEncoder passwordEncoder;
     private final EmailService emailService;
+    private final SubscriptionService subscriptionService;
 
     @GetMapping
     @Operation(
@@ -64,12 +68,33 @@ public class UserController {
         description = "Create a new user in the current tenant (Admin only). Sends welcome email with login credentials."
     )
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @EnforceLimit(LimitType.USER)
     public ResponseEntity<ApiResponse<UserDto>> createUser(
             @Parameter(description = "User details", required = true)
             @Valid @RequestBody CreateUserRequest request) {
         
         String currentTenant = TenantContext.getCurrentTenant();
         log.info("Creating user: {} in tenant: {}", request.getEmail(), currentTenant);
+
+        // Manual subscription check (fallback if aspect fails)
+        try {
+            log.info("[MANUAL CHECK] Checking subscription limit for user creation");
+            subscriptionService.enforceUserLimit();
+            log.info("[MANUAL CHECK] Subscription limit check passed");
+        } catch (com.possapp.backend.exception.SubscriptionLimitExceededException e) {
+            log.error("[MANUAL CHECK] Subscription limit exceeded: {}", e.getMessage());
+            String errorMessage = buildSubscriptionErrorMessage(
+                "user", 
+                e.getCurrentUsage(), 
+                e.getLimit(), 
+                e.getCurrentPlan(), 
+                e.getSuggestedPlan()
+            );
+            throw new UserException(errorMessage);
+        } catch (Exception e) {
+            log.error("[MANUAL CHECK] Subscription check error: {}", e.getMessage());
+            throw new UserException("Subscription check failed: " + e.getMessage());
+        }
 
         // Check if email already exists
         if (userRepository.findByEmail(request.getEmail()).isPresent()) {
@@ -98,6 +123,14 @@ public class UserController {
         }
         
         User user = userRepository.save(userBuilder.build());
+        
+        // Increment user count in subscription usage
+        try {
+            subscriptionService.incrementUserCount();
+        } catch (Exception e) {
+            log.warn("Failed to increment user count in subscription usage: {}", e.getMessage());
+        }
+        
         log.info("User created successfully: {} in tenant: {}", user.getEmail(), currentTenant);
 
         // Send welcome email with credentials
@@ -394,5 +427,55 @@ public class UserController {
         }
         
         return builder.build();
+    }
+
+    /**
+     * ==========================================================================
+     * BUILD SUBSCRIPTION ERROR MESSAGE
+     * ==========================================================================
+     * Creates a comprehensive, user-friendly error message when subscription limits
+     * are exceeded. Includes plan details, usage stats, and upgrade path.
+     * ==========================================================================
+     */
+    private String buildSubscriptionErrorMessage(
+            String resourceType,
+            int currentUsage,
+            Integer limit,
+            com.possapp.backend.entity.SubscriptionPlan currentPlan,
+            com.possapp.backend.entity.SubscriptionPlan suggestedPlan) {
+        
+        StringBuilder message = new StringBuilder();
+        
+        // Header with emoji attention grabber
+        message.append("🚫 Subscription Limit Reached\n\n");
+        
+        // Current usage details
+        message.append("📊 Current Usage:\n");
+        message.append("   • ").append(resourceType.substring(0, 1).toUpperCase())
+               .append(resourceType.substring(1)).append("s: ")
+               .append(currentUsage).append(" / ").append(limit == null ? "∞" : limit)
+               .append(" (").append(currentPlan.getDisplayName()).append(" Plan)\n\n");
+        
+        // What's included in current plan
+        message.append("✅ Your ").append(currentPlan.getDisplayName()).append(" Plan includes:\n");
+        switch (currentPlan) {
+            case STARTER -> message.append("   • 2 users, 1 branch\n   • Basic POS & Inventory\n\n");
+            case BUSINESS -> message.append("   • 5 users, 3 branches\n   • Reports & Barcode Support\n   • Multi-Branch Operations\n\n");
+            case ENTERPRISE -> message.append("   • Unlimited users & branches\n   • Advanced Analytics\n   • API Access & Integrations\n\n");
+        }
+        
+        // What's available in suggested plan
+        message.append("🚀 Upgrade to ").append(suggestedPlan.getDisplayName()).append(" for:\n");
+        switch (suggestedPlan) {
+            case BUSINESS -> message.append("   • Up to 5 users and 3 branches\n   • Sales & Inventory Reports\n   • Barcode Scanning\n   • $29.99/month\n\n");
+            case ENTERPRISE -> message.append("   • Unlimited users and branches\n   • Advanced Analytics & Insights\n   • API Access\n   • Custom Integrations\n   • $99.99/month\n\n");
+            default -> message.append("   • Contact sales for details\n\n");
+        }
+        
+        // Call to action
+        message.append("📧 To upgrade, contact: sales@possapp.com\n");
+        message.append("📞 Or call: +1 (555) 123-4567");
+        
+        return message.toString();
     }
 }

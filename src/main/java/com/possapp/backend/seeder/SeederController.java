@@ -38,18 +38,33 @@ public class SeederController {
             response.put("success", true);
             response.put("message", "Database seeded successfully");
             response.put("tenants", 3);
-            response.put("usersPerTenant", 3);
-            response.put("branchesPerTenant", 3);
             response.put("productsPerTenant", 20);
             response.put("productsPerBranch", "~6-7 products distributed across branches");
             response.put("salesData", "~300-450 receipts per branch over 3 months");
             response.put("inventoryData", "~150-240 transactions per branch over 3 months");
+            response.put("subscriptionPlans", Map.of(
+                "technova", Map.of("plan", "STARTER", "users", 2, "branches", 1),
+                "freshmart", Map.of("plan", "BUSINESS", "users", 3, "branches", 3),
+                "stylehub", Map.of("plan", "ENTERPRISE", "users", 5, "branches", 5)
+            ));
             response.put("loginInfo", Map.of(
-                "tenants", new String[]{"technova", "freshmart", "stylehub"},
-                "users", new String[]{"admin", "manager", "cashier"},
+                "technova", Map.of(
+                    "plan", "STARTER",
+                    "users", new String[]{"admin@technova.com", "cashier@technova.com"},
+                    "branches", 1
+                ),
+                "freshmart", Map.of(
+                    "plan", "BUSINESS",
+                    "users", new String[]{"admin@freshmart.com", "manager@freshmart.com", "cashier@freshmart.com"},
+                    "branches", 3
+                ),
+                "stylehub", Map.of(
+                    "plan", "ENTERPRISE",
+                    "users", new String[]{"admin@stylehub.com", "manager@stylehub.com", "cashier1@stylehub.com", "cashier2@stylehub.com", "supervisor@stylehub.com"},
+                    "branches", 5
+                ),
                 "defaultPassword", "password123",
-                "sampleLogin", "admin@technova.com / password123",
-                "userAssignment", "Each user assigned to a different branch"
+                "sampleLogin", "admin@technova.com / password123"
             ));
             
             return ResponseEntity.ok(response);
@@ -74,11 +89,11 @@ public class SeederController {
         
         info.put("available", true);
         info.put("endpoint", "POST /api/seed");
-        info.put("description", "Seeds database with 3 tenants, each with 3 users, 3 branches, and 20 products");
+        info.put("description", "Seeds database with 3 tenants with different subscription plans");
         info.put("tenants", Map.of(
-            "technova", "TechNova Electronics (electronics store)",
-            "freshmart", "FreshMart Grocery (grocery store)",
-            "stylehub", "StyleHub Fashion (clothing store)"
+            "technova", Map.of("name", "TechNova Electronics", "plan", "STARTER", "users", 2, "branches", 1),
+            "freshmart", Map.of("name", "FreshMart Grocery", "plan", "BUSINESS", "users", 3, "branches", 3),
+            "stylehub", Map.of("name", "StyleHub Fashion", "plan", "ENTERPRISE", "users", 5, "branches", 5)
         ));
         info.put("defaultPassword", "password123");
         info.put("warning", "Only available in dev/test profiles");

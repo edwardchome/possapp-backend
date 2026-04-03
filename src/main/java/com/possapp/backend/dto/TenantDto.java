@@ -9,6 +9,14 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+/**
+ * ============================================================================
+ * TENANT DTO
+ * ============================================================================
+ * Data transfer object for tenant (business) information.
+ * Excludes internal fields and sensitive data.
+ * ============================================================================
+ */
 @Data
 @Builder
 @NoArgsConstructor
@@ -23,7 +31,16 @@ public class TenantDto {
     private String contactPhone;
     private String address;
     private boolean active;
+    
+    // Subscription fields
     private String subscriptionPlan;
+    private String subscriptionStatus;
+    private LocalDateTime subscriptionStartedAt;
+    private LocalDateTime currentPeriodEnd;
+    private LocalDateTime trialEndsAt;
+    private boolean cancelAtPeriodEnd;
+    
     private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
     private LocalDateTime subscriptionExpiresAt;
 }

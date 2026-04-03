@@ -5,12 +5,17 @@ import com.possapp.backend.entity.Branch;
 import com.possapp.backend.entity.Category;
 import com.possapp.backend.entity.Product;
 import com.possapp.backend.dto.TenantDto;
+import com.possapp.backend.entity.SubscriptionPlan;
+import com.possapp.backend.entity.Tenant;
+import com.possapp.backend.entity.TenantUsage;
 import com.possapp.backend.entity.UnitOfMeasure;
 import com.possapp.backend.entity.User;
 
 import com.possapp.backend.repository.BranchRepository;
 import com.possapp.backend.repository.CategoryRepository;
 import com.possapp.backend.repository.ProductRepository;
+import com.possapp.backend.repository.TenantRepository;
+import com.possapp.backend.repository.TenantUsageRepository;
 import com.possapp.backend.repository.UnitOfMeasureRepository;
 import com.possapp.backend.repository.UserRepository;
 import com.possapp.backend.service.TenantService;
@@ -50,6 +55,8 @@ import java.util.UUID;
 public class DatabaseSeeder {
 
     private final TenantService tenantService;
+    private final TenantRepository tenantRepository;
+    private final TenantUsageRepository tenantUsageRepository;
     private final DataSource dataSource;
     private final PasswordEncoder passwordEncoder;
     private final JdbcTemplate jdbcTemplate;
@@ -66,29 +73,28 @@ public class DatabaseSeeder {
         log.info("========================================");
         
         try {
-            // Tenant 1: TechNova Electronics
+            // Tenant 1: TechNova Electronics - STARTER plan
             seedTenant(new TenantConfig(
                 "technova",
                 "TechNova Electronics",
                 "admin@technova.com",
+                SubscriptionPlan.STARTER,
                 Arrays.asList(
                     new UserData("admin@technova.com", "Admin", "User", "ADMIN"),
-                    new UserData("manager@technova.com", "Manager", "User", "MANAGER"),
                     new UserData("cashier@technova.com", "Cashier", "User", "USER")
                 ),
                 Arrays.asList(
-                    new BranchData("Main Store", "MAIN", true, true),
-                    new BranchData("Downtown Branch", "DWN", false, true),
-                    new BranchData("Warehouse", "WH", false, false)
+                    new BranchData("Main Store", "MAIN", true, true)
                 ),
                 getElectronicsProducts()
             ));
 
-            // Tenant 2: FreshMart Grocery
+            // Tenant 2: FreshMart Grocery - BUSINESS plan
             seedTenant(new TenantConfig(
                 "freshmart",
                 "FreshMart Grocery",
                 "admin@freshmart.com",
+                SubscriptionPlan.BUSINESS,
                 Arrays.asList(
                     new UserData("admin@freshmart.com", "Admin", "User", "ADMIN"),
                     new UserData("manager@freshmart.com", "Manager", "User", "MANAGER"),
@@ -102,20 +108,25 @@ public class DatabaseSeeder {
                 getGroceryProducts()
             ));
 
-            // Tenant 3: StyleHub Fashion
+            // Tenant 3: StyleHub Fashion - ENTERPRISE plan
             seedTenant(new TenantConfig(
                 "stylehub",
                 "StyleHub Fashion",
                 "admin@stylehub.com",
+                SubscriptionPlan.ENTERPRISE,
                 Arrays.asList(
                     new UserData("admin@stylehub.com", "Admin", "User", "ADMIN"),
                     new UserData("manager@stylehub.com", "Manager", "User", "MANAGER"),
-                    new UserData("cashier@stylehub.com", "Cashier", "User", "USER")
+                    new UserData("cashier1@stylehub.com", "Cashier", "One", "USER"),
+                    new UserData("cashier2@stylehub.com", "Cashier", "Two", "USER"),
+                    new UserData("supervisor@stylehub.com", "Supervisor", "User", "MANAGER")
                 ),
                 Arrays.asList(
                     new BranchData("Mall Store", "MALL", true, true),
                     new BranchData("Street Shop", "STR", false, true),
-                    new BranchData("Online Warehouse", "ONL", false, false)
+                    new BranchData("Online Warehouse", "ONL", false, false),
+                    new BranchData("Airport Store", "AIR", false, true),
+                    new BranchData("Outlet Store", "OUT", false, true)
                 ),
                 getFashionProducts()
             ));
@@ -123,16 +134,18 @@ public class DatabaseSeeder {
             log.info("========================================");
             log.info("Database Seeding Completed Successfully!");
             log.info("========================================");
-            log.info("Created 3 tenants, each with:");
-            log.info("  - 3 users (admin, manager, cashier) - assigned to different branches");
-            log.info("  - 3 branches (Main + 2 additional)");
+            log.info("Created 3 tenants with different subscription plans:");
+            log.info("  1. TechNova Electronics - STARTER plan (2 users, 1 branch)");
+            log.info("  2. FreshMart Grocery - BUSINESS plan (3 users, 3 branches)");
+            log.info("  3. StyleHub Fashion - ENTERPRISE plan (5 users, 5 branches)");
+            log.info("Each tenant has:");
             log.info("  - 20 products (~6-7 per branch, distributed)");
             log.info("  - ~300-450 sales receipts over 3 months per branch");
             log.info("  - ~150-240 inventory transactions over 3 months per branch");
             log.info("Login credentials:");
-            log.info("  - Admin: admin@<tenant>.com / {}", DEFAULT_PASSWORD);
-            log.info("  - Manager: manager@<tenant>.com / {}", DEFAULT_PASSWORD);
-            log.info("  - Cashier: cashier@<tenant>.com / {}", DEFAULT_PASSWORD);
+            log.info("  - TechNova: admin@technova.com, cashier@technova.com / {}", DEFAULT_PASSWORD);
+            log.info("  - FreshMart: admin@freshmart.com, manager@freshmart.com, cashier@freshmart.com / {}", DEFAULT_PASSWORD);
+            log.info("  - StyleHub: admin@stylehub.com, manager@stylehub.com, cashier1@stylehub.com, cashier2@stylehub.com, supervisor@stylehub.com / {}", DEFAULT_PASSWORD);
             
         } catch (Exception e) {
             log.error("Error during database seeding: {}", e.getMessage(), e);
@@ -160,9 +173,14 @@ public class DatabaseSeeder {
         request.setCompanyName(config.companyName);
         request.setAdminEmail(config.adminEmail);
         request.setPassword(DEFAULT_PASSWORD);
+        request.setSubscriptionPlan(config.subscriptionPlan.name());
         
         TenantDto tenant = tenantService.registerTenant(request);
-        log.info("✓ Created tenant: {} (schema: {})", tenant.getCompanyName(), config.schemaName);
+        log.info("✓ Created tenant: {} (schema: {}) with {} plan", 
+            tenant.getCompanyName(), config.schemaName, config.subscriptionPlan.getDisplayName());
+        
+        // Update tenant subscription plan and create usage record
+        updateTenantSubscription(config.schemaName, config.subscriptionPlan, config.users.size(), config.branches.size());
         
         // Set tenant context for subsequent operations
         TenantContext.setCurrentTenant(config.schemaName);
@@ -226,6 +244,36 @@ public class DatabaseSeeder {
             log.info("  Dropped existing schema: {}", schemaName);
         } catch (Exception e) {
             // Schema might not exist, ignore
+        }
+    }
+
+    /**
+     * Update tenant subscription plan and create usage record
+     */
+    private void updateTenantSubscription(String schemaName, SubscriptionPlan plan, int userCount, int branchCount) {
+        try {
+            // Update tenant subscription in public.tenants
+            String updateSql = "UPDATE public.tenants SET subscription_plan = ?, subscription_status = ?, " +
+                "subscription_started_at = CURRENT_TIMESTAMP, current_period_end = CURRENT_TIMESTAMP + INTERVAL '1 year' " +
+                "WHERE schema_name = ?";
+            jdbcTemplate.update(updateSql, plan.name(), "ACTIVE", schemaName);
+            
+            // Get tenant ID
+            String tenantId = jdbcTemplate.queryForObject(
+                "SELECT id FROM public.tenants WHERE schema_name = ?", String.class, schemaName);
+            
+            // Create or update tenant usage record
+            String usageSql = "INSERT INTO public.tenant_usage (id, tenant_id, current_users, current_branches, current_products, current_monthly_transactions) " +
+                "VALUES (gen_random_uuid(), ?, ?, ?, 0, 0) " +
+                "ON CONFLICT (tenant_id) DO UPDATE SET " +
+                "current_users = EXCLUDED.current_users, " +
+                "current_branches = EXCLUDED.current_branches, " +
+                "calculated_at = CURRENT_TIMESTAMP";
+            jdbcTemplate.update(usageSql, tenantId, userCount, branchCount);
+            
+            log.info("  ✓ Set subscription to {} with usage: {} users, {} branches", plan.getDisplayName(), userCount, branchCount);
+        } catch (Exception e) {
+            log.warn("  ⚠ Could not update subscription for {}: {}", schemaName, e.getMessage());
         }
     }
 
@@ -597,15 +645,17 @@ public class DatabaseSeeder {
         final String schemaName;
         final String companyName;
         final String adminEmail;
+        final SubscriptionPlan subscriptionPlan;
         final List<UserData> users;
         final List<BranchData> branches;
         final List<ProductData> products;
 
-        TenantConfig(String schemaName, String companyName, String adminEmail,
+        TenantConfig(String schemaName, String companyName, String adminEmail, SubscriptionPlan subscriptionPlan,
                      List<UserData> users, List<BranchData> branches, List<ProductData> products) {
             this.schemaName = schemaName;
             this.companyName = companyName;
             this.adminEmail = adminEmail;
+            this.subscriptionPlan = subscriptionPlan;
             this.users = users;
             this.branches = branches;
             this.products = products;

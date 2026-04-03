@@ -2,6 +2,7 @@ package com.possapp.backend.service;
 
 import com.possapp.backend.dto.TenantDto;
 import com.possapp.backend.dto.TenantRegistrationRequest;
+import com.possapp.backend.entity.SubscriptionPlan;
 import com.possapp.backend.entity.Tenant;
 import com.possapp.backend.exception.TenantException;
 import com.possapp.backend.repository.TenantRepository;
@@ -53,6 +54,11 @@ public class TenantService {
      * Works with the "tenants" table in the public schema.
      */
     private final TenantRepository tenantRepository;
+    
+    /**
+     * Repository for tenant usage tracking.
+     */
+    private final com.possapp.backend.repository.TenantUsageRepository tenantUsageRepository;
     
     /**
      * JdbcTemplate for low-level SQL operations.
@@ -182,7 +188,7 @@ public class TenantService {
             .adminEmail(request.getAdminEmail())
             .contactPhone(request.getContactPhone())
             .address(request.getAddress())
-            .subscriptionPlan(request.getSubscriptionPlan())
+            .subscriptionPlan(SubscriptionPlan.fromString(request.getSubscriptionPlan()))
             .subscriptionExpiresAt(LocalDateTime.now().plusYears(1))
             .active(true)
             .build();
@@ -193,9 +199,12 @@ public class TenantService {
         // This is done via raw JDBC as JPA doesn't support schema creation
         createTenantSchemaAndAdmin(schemaName, request.getAdminEmail(), request.getPassword());
         
+        // Step 8: Create initial usage record (1 user, 1 branch created by default)
+        createInitialUsageRecord(tenant.getId());
+        
         log.info("Successfully created tenant: {} with schema: {}", request.getCompanyName(), schemaName);
         
-        // Step 8: Return DTO for response
+        // Step 9: Return DTO for response
         return mapToDto(tenant);
     }
     
@@ -672,7 +681,9 @@ public class TenantService {
             .contactPhone(tenant.getContactPhone())
             .address(tenant.getAddress())
             .active(tenant.isActive())
-            .subscriptionPlan(tenant.getSubscriptionPlan())
+            .subscriptionPlan(tenant.getSubscriptionPlan() != null ? tenant.getSubscriptionPlan().name() : "STARTER")
+            .subscriptionStatus(tenant.getSubscriptionStatus() != null ? tenant.getSubscriptionStatus().name() : "ACTIVE")
+            .currentPeriodEnd(tenant.getCurrentPeriodEnd())
             .createdAt(tenant.getCreatedAt())
             .subscriptionExpiresAt(tenant.getSubscriptionExpiresAt())
             .build();
@@ -745,5 +756,31 @@ public class TenantService {
         
         tenant = tenantRepository.save(tenant);
         return mapToDto(tenant);
+    }
+    
+    /**
+     * ==========================================================================
+     * CREATE INITIAL USAGE RECORD
+     * ==========================================================================
+     * Creates the initial tenant usage record after tenant registration.
+     * Initial state: 1 user (admin), 1 branch (main), 0 products.
+     * 
+     * @param tenantId The tenant UUID
+     * ==========================================================================
+     */
+    private void createInitialUsageRecord(java.util.UUID tenantId) {
+        try {
+            com.possapp.backend.entity.TenantUsage usage = com.possapp.backend.entity.TenantUsage.builder()
+                    .tenantId(tenantId)
+                    .currentUsers(1)  // Admin user created by registerTenant
+                    .currentBranches(1)  // Main branch created by registerTenant
+                    .currentProducts(0)
+                    .currentMonthlyTransactions(0)
+                    .build();
+            tenantUsageRepository.save(usage);
+            log.info("✓ Created initial usage record for tenant: {}", tenantId);
+        } catch (Exception e) {
+            log.warn("⚠ Could not create usage record for tenant {}: {}", tenantId, e.getMessage());
+        }
     }
 }

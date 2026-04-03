@@ -25,5 +25,5 @@ public class TenantRegistrationRequest {
     
     private String contactPhone;
     private String address;
-    private String subscriptionPlan = "FREE";
+    private String subscriptionPlan = "STARTER";
 }
