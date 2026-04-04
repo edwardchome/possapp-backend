@@ -100,7 +100,7 @@ public class SubscriptionService {
                 .currentPeriodStart(tenant.getSubscriptionStartedAt())
                 .currentPeriodEnd(tenant.getCurrentPeriodEnd())
                 .trialEndsAt(tenant.getTrialEndsAt())
-                .daysUntilExpiry(daysUntilExpiry != null && daysUntilExpiry < 0 ? 0 : daysUntilExpiry)
+                .daysUntilExpiry(daysUntilExpiry != null ? (daysUntilExpiry < 0 ? 0 : daysUntilExpiry) : null)
                 .usage(buildUsageDto(config, usage))
                 .features(buildFeatureFlags(config))
                 .canUpgrade(tenant.getSubscriptionPlan() != SubscriptionPlan.ENTERPRISE)
