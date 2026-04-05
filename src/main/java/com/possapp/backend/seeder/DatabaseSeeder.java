@@ -6,6 +6,7 @@ import com.possapp.backend.entity.Category;
 import com.possapp.backend.entity.Product;
 import com.possapp.backend.dto.TenantDto;
 import com.possapp.backend.entity.SubscriptionPlan;
+import com.possapp.backend.entity.SubscriptionStatus;
 import com.possapp.backend.entity.Tenant;
 import com.possapp.backend.entity.TenantUsage;
 import com.possapp.backend.entity.UnitOfMeasure;
@@ -249,14 +250,22 @@ public class DatabaseSeeder {
 
     /**
      * Update tenant subscription plan and create usage record
+     * For seeded tenants, we set them as ACTIVE with a 1-year period (not in trial)
+     * This ensures they have full functionality for development/testing
      */
     private void updateTenantSubscription(String schemaName, SubscriptionPlan plan, int userCount, int branchCount) {
         try {
+            LocalDateTime now = LocalDateTime.now();
+            LocalDateTime periodEnd = now.plusYears(1);
+            
             // Update tenant subscription in public.tenants
+            // Seeded tenants are set to ACTIVE (not TRIAL) for immediate full access
             String updateSql = "UPDATE public.tenants SET subscription_plan = ?, subscription_status = ?, " +
-                "subscription_started_at = CURRENT_TIMESTAMP, current_period_end = CURRENT_TIMESTAMP + INTERVAL '1 year' " +
+                "subscription_started_at = ?, current_period_end = ?, trial_ends_at = NULL, " +
+                "grace_period_ends_at = NULL, trial_reminder_sent = false, " +
+                "trial_ended_notification_sent = false, grace_period_notification_sent = false " +
                 "WHERE schema_name = ?";
-            jdbcTemplate.update(updateSql, plan.name(), "ACTIVE", schemaName);
+            jdbcTemplate.update(updateSql, plan.name(), SubscriptionStatus.ACTIVE.name(), now, periodEnd, schemaName);
             
             // Get tenant ID
             String tenantId = jdbcTemplate.queryForObject(
@@ -271,7 +280,8 @@ public class DatabaseSeeder {
                 "calculated_at = CURRENT_TIMESTAMP";
             jdbcTemplate.update(usageSql, tenantId, userCount, branchCount);
             
-            log.info("  ✓ Set subscription to {} with usage: {} users, {} branches", plan.getDisplayName(), userCount, branchCount);
+            log.info("  ✓ Set subscription to {} (ACTIVE, expires {}) with usage: {} users, {} branches", 
+                plan.getDisplayName(), periodEnd.toLocalDate(), userCount, branchCount);
         } catch (Exception e) {
             log.warn("  ⚠ Could not update subscription for {}: {}", schemaName, e.getMessage());
         }
