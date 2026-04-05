@@ -5,8 +5,6 @@ import com.possapp.backend.entity.Tenant;
 import com.possapp.backend.exception.SoftLockException;
 import com.possapp.backend.repository.TenantRepository;
 import com.possapp.backend.tenant.TenantContext;
-import com.possapp.backend.repository.TenantRepository;
-import com.possapp.backend.tenant.TenantContext;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,6 +16,7 @@ import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.Set;
 
 /**
