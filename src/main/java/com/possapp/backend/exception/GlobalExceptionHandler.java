@@ -162,20 +162,48 @@ public class GlobalExceptionHandler {
         return message.toString();
     }
     
-    @ExceptionHandler(com.possapp.backend.aspect.SubscriptionAspect.SubscriptionAccessDeniedException.class)
-    public ResponseEntity<ApiResponse<Map<String, String>>> handleSubscriptionAccessDenied(
-            com.possapp.backend.aspect.SubscriptionAspect.SubscriptionAccessDeniedException e, HttpServletRequest request) {
+    @ExceptionHandler(SubscriptionAccessDeniedException.class)
+    public ResponseEntity<ApiResponse<Map<String, Object>>> handleSubscriptionAccessDenied(
+            SubscriptionAccessDeniedException e, HttpServletRequest request) {
         log.warn("Subscription access denied: {}", e.getMessage());
         
-        Map<String, String> details = new HashMap<>();
-        details.put("requiredPlan", e.getRequiredPlan().name());
-        details.put("currentPlan", e.getCurrentPlan().name());
-        details.put("errorCode", e.getErrorCode());
+        Map<String, Object> details = new HashMap<>();
+        if (e.getRequiredPlan() != null) {
+            details.put("requiredPlan", e.getRequiredPlan().name());
+        }
+        if (e.getCurrentPlan() != null) {
+            details.put("currentPlan", e.getCurrentPlan().name());
+        }
+        if (e.getRemainingDays() != null) {
+            details.put("remainingDays", e.getRemainingDays());
+        }
+        details.put("isSoftLock", e.isSoftLock());
         
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
-            .body(ApiResponse.<Map<String, String>>builder()
+            .body(ApiResponse.<Map<String, Object>>builder()
                 .success(false)
                 .error("Subscription Required")
+                .message(e.getMessage())
+                .data(details)
+                .timestamp(LocalDateTime.now())
+                .build());
+    }
+    
+    @ExceptionHandler(SoftLockException.class)
+    public ResponseEntity<ApiResponse<Map<String, Object>>> handleSoftLock(
+            SoftLockException e, HttpServletRequest request) {
+        log.warn("Soft lock enforced: {}", e.getMessage());
+        
+        Map<String, Object> details = new HashMap<>();
+        details.put("currentPlan", e.getCurrentPlan());
+        details.put("daysInSoftLock", e.getDaysInSoftLock());
+        details.put("upgradeUrl", e.getUpgradeUrl());
+        details.put("errorCode", "SOFT_LOCK_ACTIVE");
+        
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+            .body(ApiResponse.<Map<String, Object>>builder()
+                .success(false)
+                .error("Account in Read-Only Mode")
                 .message(e.getMessage())
                 .data(details)
                 .timestamp(LocalDateTime.now())

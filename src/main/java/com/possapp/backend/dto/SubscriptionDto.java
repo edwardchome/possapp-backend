@@ -45,6 +45,12 @@ public class SubscriptionDto {
     private boolean isInTrial;
     private boolean needsRenewal;
     
+    // Grace period and soft lock
+    private LocalDateTime gracePeriodEndsAt;
+    private Integer daysRemainingInGracePeriod;
+    private boolean isInGracePeriod;
+    private boolean isSoftLocked;
+    
     // Next plan suggestion (when at limits)
     private String suggestedPlan;
     private String suggestedPlanDisplayName;

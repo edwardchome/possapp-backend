@@ -7,6 +7,7 @@ import com.possapp.backend.dto.SubscriptionDto;
 import com.possapp.backend.entity.Feature;
 import com.possapp.backend.entity.LimitType;
 import com.possapp.backend.entity.SubscriptionPlan;
+import com.possapp.backend.exception.SubscriptionAccessDeniedException;
 import com.possapp.backend.exception.SubscriptionLimitExceededException;
 import com.possapp.backend.service.SubscriptionService;
 import lombok.RequiredArgsConstructor;
@@ -132,32 +133,6 @@ public class SubscriptionAspect {
     }
 
     // ==================== CUSTOM EXCEPTIONS ====================
-
-    /**
-     * Exception thrown when subscription plan requirement is not met.
-     */
-    public static class SubscriptionAccessDeniedException extends RuntimeException {
-        private final SubscriptionPlan requiredPlan;
-        private final SubscriptionPlan currentPlan;
-
-        public SubscriptionAccessDeniedException(String message, SubscriptionPlan requiredPlan, SubscriptionPlan currentPlan) {
-            super(message);
-            this.requiredPlan = requiredPlan;
-            this.currentPlan = currentPlan;
-        }
-
-        public SubscriptionPlan getRequiredPlan() {
-            return requiredPlan;
-        }
-
-        public SubscriptionPlan getCurrentPlan() {
-            return currentPlan;
-        }
-
-        public String getErrorCode() {
-            return "SUBSCRIPTION_PLAN_REQUIRED_" + requiredPlan.name();
-        }
-    }
 
     /**
      * Exception thrown when feature access is denied.

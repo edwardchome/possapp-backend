@@ -86,6 +86,21 @@ public class Tenant {
     @Column(name = "subscription_expires_at")
     private LocalDateTime subscriptionExpiresAt;
     
+    @Column(name = "grace_period_ends_at")
+    private LocalDateTime gracePeriodEndsAt;
+    
+    @Column(name = "trial_reminder_sent", nullable = false)
+    @Builder.Default
+    private boolean trialReminderSent = false;
+    
+    @Column(name = "trial_ended_notification_sent", nullable = false)
+    @Builder.Default
+    private boolean trialEndedNotificationSent = false;
+    
+    @Column(name = "grace_period_notification_sent", nullable = false)
+    @Builder.Default
+    private boolean gracePeriodNotificationSent = false;
+    
     // ==================== TIMESTAMP FIELDS ====================
     
     @CreationTimestamp
@@ -166,5 +181,82 @@ public class Tenant {
      */
     public void setSubscriptionPlanString(String plan) {
         this.subscriptionPlan = SubscriptionPlan.fromString(plan);
+    }
+    
+    // ==================== TRIAL & GRACE PERIOD METHODS ====================
+    
+    /**
+     * Check if the tenant is in the grace period after trial expiration.
+     */
+    public boolean isInGracePeriod() {
+        return gracePeriodEndsAt != null && 
+               gracePeriodEndsAt.isAfter(LocalDateTime.now()) &&
+               (subscriptionStatus == SubscriptionStatus.EXPIRED || 
+                subscriptionStatus == SubscriptionStatus.PAST_DUE);
+    }
+    
+    /**
+     * Check if the grace period has ended.
+     */
+    public boolean isGracePeriodEnded() {
+        return gracePeriodEndsAt != null && gracePeriodEndsAt.isBefore(LocalDateTime.now());
+    }
+    
+    /**
+     * Check if the trial has expired but grace period hasn't started.
+     */
+    public boolean isTrialExpired() {
+        return !isInTrial() && 
+               (subscriptionStatus == SubscriptionStatus.TRIAL || 
+                subscriptionStatus == SubscriptionStatus.EXPIRED) &&
+               gracePeriodEndsAt == null;
+    }
+    
+    /**
+     * Check if soft lock is active (read-only mode).
+     * Soft lock is active when:
+     * - Trial has ended and grace period has ended, OR
+     * - Subscription is expired and grace period has ended
+     */
+    public boolean isSoftLocked() {
+        if (subscriptionStatus == SubscriptionStatus.SUSPENDED) {
+            return true; // Hard suspension
+        }
+        if (isInGracePeriod()) {
+            return false; // Grace period allows full access
+        }
+        if (subscriptionStatus == SubscriptionStatus.EXPIRED || 
+            subscriptionStatus == SubscriptionStatus.PAST_DUE) {
+            return true; // Expired without active grace period
+        }
+        // Trial ended and grace period ended (or never started)
+        if (!isInTrial() && trialEndsAt != null && 
+            trialEndsAt.isBefore(LocalDateTime.now()) &&
+            (gracePeriodEndsAt == null || gracePeriodEndsAt.isBefore(LocalDateTime.now()))) {
+            return true;
+        }
+        return false;
+    }
+    
+    /**
+     * Get days remaining in trial.
+     */
+    public int getDaysRemainingInTrial() {
+        if (!isInTrial() || trialEndsAt == null) {
+            return 0;
+        }
+        return (int) java.time.temporal.ChronoUnit.DAYS.between(
+            LocalDateTime.now(), trialEndsAt);
+    }
+    
+    /**
+     * Get days remaining in grace period.
+     */
+    public int getDaysRemainingInGracePeriod() {
+        if (!isInGracePeriod() || gracePeriodEndsAt == null) {
+            return 0;
+        }
+        return (int) java.time.temporal.ChronoUnit.DAYS.between(
+            LocalDateTime.now(), gracePeriodEndsAt);
     }
 }

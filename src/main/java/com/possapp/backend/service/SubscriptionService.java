@@ -93,6 +93,12 @@ public class SubscriptionService {
             suggestedPlan = getNextPlan(tenant.getSubscriptionPlan());
         }
         
+        // Calculate grace period info
+        Integer daysRemainingInGracePeriod = null;
+        if (tenant.isInGracePeriod()) {
+            daysRemainingInGracePeriod = tenant.getDaysRemainingInGracePeriod();
+        }
+        
         return SubscriptionDto.builder()
                 .plan(tenant.getSubscriptionPlan().name())
                 .status(tenant.getSubscriptionStatus().name())
@@ -107,6 +113,10 @@ public class SubscriptionService {
                 .canCancel(tenant.getSubscriptionPlan() != SubscriptionPlan.STARTER)
                 .isInTrial(tenant.isInTrial())
                 .needsRenewal(needsRenewal)
+                .gracePeriodEndsAt(tenant.getGracePeriodEndsAt())
+                .daysRemainingInGracePeriod(daysRemainingInGracePeriod)
+                .isInGracePeriod(tenant.isInGracePeriod())
+                .isSoftLocked(tenant.isSoftLocked())
                 .suggestedPlan(suggestedPlan != null ? suggestedPlan.name() : null)
                 .suggestedPlanDisplayName(suggestedPlan != null ? suggestedPlan.getDisplayName() : null)
                 .build();

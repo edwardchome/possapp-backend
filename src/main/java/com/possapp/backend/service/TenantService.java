@@ -3,6 +3,7 @@ package com.possapp.backend.service;
 import com.possapp.backend.dto.TenantDto;
 import com.possapp.backend.dto.TenantRegistrationRequest;
 import com.possapp.backend.entity.SubscriptionPlan;
+import com.possapp.backend.entity.SubscriptionStatus;
 import com.possapp.backend.entity.Tenant;
 import com.possapp.backend.exception.TenantException;
 import com.possapp.backend.repository.TenantRepository;
@@ -182,6 +183,10 @@ public class TenantService {
         
         // Step 3: Create tenant record in public schema
         // This stores the business info and links to the schema
+        // Set up 14-day trial period for new registrations
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime trialEndsAt = now.plusDays(14);
+        
         Tenant tenant = Tenant.builder()
             .companyName(request.getCompanyName())
             .schemaName(schemaName)
@@ -189,7 +194,11 @@ public class TenantService {
             .contactPhone(request.getContactPhone())
             .address(request.getAddress())
             .subscriptionPlan(SubscriptionPlan.fromString(request.getSubscriptionPlan()))
-            .subscriptionExpiresAt(LocalDateTime.now().plusYears(1))
+            .subscriptionStatus(SubscriptionStatus.TRIAL)  // Start in trial mode
+            .subscriptionStartedAt(now)
+            .trialEndsAt(trialEndsAt)
+            .currentPeriodEnd(trialEndsAt)  // Trial period is the current period
+            .subscriptionExpiresAt(trialEndsAt)
             .active(true)
             .build();
         
