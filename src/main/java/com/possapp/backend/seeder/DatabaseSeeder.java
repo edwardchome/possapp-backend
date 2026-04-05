@@ -355,21 +355,21 @@ public class DatabaseSeeder {
                 "WHERE schema_name = ?";
             jdbcTemplate.update(updateSql, plan.name(), SubscriptionStatus.ACTIVE.name(), now, periodEnd, schemaName);
             
-            // Get tenant ID
-            String tenantId = jdbcTemplate.queryForObject(
-                "SELECT id FROM public.tenants WHERE schema_name = ?", String.class, schemaName);
+            // Get tenant ID as UUID
+            UUID tenantId = jdbcTemplate.queryForObject(
+                "SELECT id FROM public.tenants WHERE schema_name = ?", UUID.class, schemaName);
             
             // Create or update tenant usage record
             // First try to update existing record
             String updateUsageSql = "UPDATE public.tenant_usage SET current_users = ?, current_branches = ?, " +
-                "calculated_at = CURRENT_TIMESTAMP WHERE tenant_id = ?";
-            int updated = jdbcTemplate.update(updateUsageSql, userCount, branchCount, tenantId);
+                "calculated_at = CURRENT_TIMESTAMP WHERE tenant_id = ?::uuid";
+            int updated = jdbcTemplate.update(updateUsageSql, userCount, branchCount, tenantId.toString());
             
             // If no record exists, insert new one
             if (updated == 0) {
                 String insertUsageSql = "INSERT INTO public.tenant_usage (id, tenant_id, current_users, current_branches, current_products, current_monthly_transactions) " +
-                    "VALUES (gen_random_uuid(), ?, ?, ?, 0, 0)";
-                jdbcTemplate.update(insertUsageSql, tenantId, userCount, branchCount);
+                    "VALUES (gen_random_uuid(), ?::uuid, ?, ?, 0, 0)";
+                jdbcTemplate.update(insertUsageSql, tenantId.toString(), userCount, branchCount);
             }
             
             log.info("  ✓ Set subscription to {} (ACTIVE, expires {}) with usage: {} users, {} branches", 
