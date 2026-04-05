@@ -25,15 +25,17 @@ public class SeederController {
     /**
      * Seed the database with test data
      * POST /api/seed
+     * POST /api/seed?force=true - Force reseed (drops existing tenants)
      */
     @PostMapping
-    public ResponseEntity<Map<String, Object>> seedDatabase() {
-        log.info("Received request to seed database");
+    public ResponseEntity<Map<String, Object>> seedDatabase(
+            @RequestParam(name = "force", defaultValue = "false") boolean force) {
+        log.info("Received request to seed database (force={})", force);
         
         Map<String, Object> response = new HashMap<>();
         
         try {
-            databaseSeeder.seedAll();
+            databaseSeeder.seedAll(force);
             
             response.put("success", true);
             response.put("message", "Database seeded successfully");

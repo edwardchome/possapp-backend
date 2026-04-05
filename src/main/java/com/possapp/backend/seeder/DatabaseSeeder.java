@@ -69,9 +69,28 @@ public class DatabaseSeeder {
      * Note: Not @Transactional because TenantService.registerTenant handles its own transactions
      */
     public void seedAll() {
+        seedAll(false);
+    }
+    
+    /**
+     * Seed all data with option to force reseed (drop existing)
+     * @param forceReseed if true, drops all existing tenant schemas and recreates them
+     */
+    public void seedAll(boolean forceReseed) {
         log.info("========================================");
         log.info("Starting Database Seeding...");
+        if (forceReseed) {
+            log.info("⚠️  FORCE RESEED ENABLED - Will drop and recreate all tenants!");
+        }
         log.info("========================================");
+        
+        // Verify public schema exists before seeding
+        ensurePublicSchemaExists();
+        
+        // If force reseed, clear all existing tenant data
+        if (forceReseed) {
+            clearAllTenants();
+        }
         
         try {
             // Tenant 1: TechNova Electronics - STARTER plan
@@ -234,9 +253,53 @@ public class DatabaseSeeder {
     }
 
     private boolean tenantExists(String schemaName) {
-        String sql = "SELECT COUNT(*) FROM public.tenants WHERE schema_name = ?";
-        Integer count = jdbcTemplate.queryForObject(sql, Integer.class, schemaName);
-        return count != null && count > 0;
+        try {
+            String sql = "SELECT COUNT(*) FROM public.tenants WHERE schema_name = ?";
+            Integer count = jdbcTemplate.queryForObject(sql, Integer.class, schemaName);
+            return count != null && count > 0;
+        } catch (Exception e) {
+            // Table doesn't exist or other error - tenant doesn't exist
+            log.warn("Could not check tenant existence (table may not exist yet): {}", e.getMessage());
+            return false;
+        }
+    }
+    
+    /**
+     * Check if the public schema and required tables exist.
+     * If not, log an error with instructions.
+     */
+    private void ensurePublicSchemaExists() {
+        try {
+            // Check if public.tenants table exists
+            String sql = "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'tenants'";
+            Integer count = jdbcTemplate.queryForObject(sql, Integer.class);
+            
+            if (count == null || count == 0) {
+                log.error("╔════════════════════════════════════════════════════════════════╗");
+                log.error("║  PUBLIC SCHEMA ERROR: public.tenants table does not exist!    ║");
+                log.error("╠════════════════════════════════════════════════════════════════╣");
+                log.error("║  Flyway migrations may not have run. Please:                  ║");
+                log.error("║  1. Ensure database 'possapp_db' exists                       ║");
+                log.error("║  2. Check Flyway is enabled in application.yml                ║");
+                log.error("║  3. Run: mvn flyway:migrate                                   ║");
+                log.error("║  4. Or restart the application with 'dev' profile             ║");
+                log.error("╚════════════════════════════════════════════════════════════════╝");
+                throw new RuntimeException("public.tenants table does not exist. Run Flyway migrations first.");
+            }
+            
+            // Check if subscription_limits table exists (from V18 migration)
+            String limitsSql = "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'subscription_limits'";
+            Integer limitsCount = jdbcTemplate.queryForObject(limitsSql, Integer.class);
+            
+            if (limitsCount == null || limitsCount == 0) {
+                log.warn("⚠️  public.subscription_limits table does not exist. Run V18 migration.");
+            }
+            
+            log.info("✓ Public schema verified - tenants table exists");
+        } catch (Exception e) {
+            log.error("Failed to verify public schema: {}", e.getMessage());
+            throw new RuntimeException("Database schema verification failed", e);
+        }
     }
     
     private void dropSchemaIfExists(String schemaName) {
@@ -245,6 +308,31 @@ public class DatabaseSeeder {
             log.info("  Dropped existing schema: {}", schemaName);
         } catch (Exception e) {
             // Schema might not exist, ignore
+        }
+    }
+    
+    /**
+     * Clear all tenants and their schemas for force reseed
+     */
+    private void clearAllTenants() {
+        log.info("🗑️  Clearing all existing tenants for force reseed...");
+        try {
+            // Get all tenant schemas
+            List<String> schemas = jdbcTemplate.queryForList(
+                "SELECT schema_name FROM public.tenants", String.class);
+            
+            // Drop each tenant schema
+            for (String schema : schemas) {
+                dropSchemaIfExists(schema);
+            }
+            
+            // Clear public tenant tables
+            jdbcTemplate.execute("TRUNCATE TABLE public.tenant_usage CASCADE");
+            jdbcTemplate.execute("TRUNCATE TABLE public.tenants CASCADE");
+            
+            log.info("✓ Cleared {} existing tenants", schemas.size());
+        } catch (Exception e) {
+            log.warn("Could not clear all tenants: {}", e.getMessage());
         }
     }
 
