@@ -360,13 +360,17 @@ public class DatabaseSeeder {
                 "SELECT id FROM public.tenants WHERE schema_name = ?", String.class, schemaName);
             
             // Create or update tenant usage record
-            String usageSql = "INSERT INTO public.tenant_usage (id, tenant_id, current_users, current_branches, current_products, current_monthly_transactions) " +
-                "VALUES (gen_random_uuid(), ?, ?, ?, 0, 0) " +
-                "ON CONFLICT (tenant_id) DO UPDATE SET " +
-                "current_users = EXCLUDED.current_users, " +
-                "current_branches = EXCLUDED.current_branches, " +
-                "calculated_at = CURRENT_TIMESTAMP";
-            jdbcTemplate.update(usageSql, tenantId, userCount, branchCount);
+            // First try to update existing record
+            String updateUsageSql = "UPDATE public.tenant_usage SET current_users = ?, current_branches = ?, " +
+                "calculated_at = CURRENT_TIMESTAMP WHERE tenant_id = ?";
+            int updated = jdbcTemplate.update(updateUsageSql, userCount, branchCount, tenantId);
+            
+            // If no record exists, insert new one
+            if (updated == 0) {
+                String insertUsageSql = "INSERT INTO public.tenant_usage (id, tenant_id, current_users, current_branches, current_products, current_monthly_transactions) " +
+                    "VALUES (gen_random_uuid(), ?, ?, ?, 0, 0)";
+                jdbcTemplate.update(insertUsageSql, tenantId, userCount, branchCount);
+            }
             
             log.info("  ✓ Set subscription to {} (ACTIVE, expires {}) with usage: {} users, {} branches", 
                 plan.getDisplayName(), periodEnd.toLocalDate(), userCount, branchCount);
