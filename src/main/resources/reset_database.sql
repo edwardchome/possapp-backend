@@ -13,8 +13,8 @@ DO $$
 DECLARE
     schema_name text;
 BEGIN
-    FOR schema_name IN 
-        SELECT schema_name FROM information_schema.schemata 
+    FOR schema_name IN
+        SELECT schema_name FROM information_schema.schemata
         WHERE schema_name NOT IN ('public', 'pg_catalog', 'information_schema', 'pg_toast')
     LOOP
         EXECUTE 'DROP SCHEMA IF EXISTS ' || quote_ident(schema_name) || ' CASCADE';
@@ -33,7 +33,7 @@ COMMIT;
 
 -- Verify cleanup
 SELECT 'Remaining schemas:' as info;
-SELECT schema_name FROM information_schema.schemata 
+SELECT schema_name FROM information_schema.schemata
 WHERE schema_name NOT IN ('public', 'pg_catalog', 'information_schema', 'pg_toast');
 
 SELECT 'Remaining tenants:' as info;

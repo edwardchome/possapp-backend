@@ -1,0 +1,59 @@
+# ============================================================================
+# TRIAL DEBUG PROFILE
+# ============================================================================
+# 
+# This profile enables shortened trial periods for testing.
+# 
+# Usage:
+#   mvn spring-boot:run -Dspring-boot.run.profiles=trial-debug
+# 
+# Or add to your application.yml:
+#   spring:
+#     profiles:
+#       active: trial-debug
+#
+# WARNING: DO NOT USE IN PRODUCTION!
+# This profile uses extremely short intervals for rapid testing.
+# ============================================================================
+
+# Enable debug mode for trial notifications
+trial:
+  debug:
+    enabled: true
+    # Check for trial expirations every 1 minute (instead of daily)
+    check-interval: 1m
+    # First reminder 2 minutes before expiration (instead of 3 days)
+    reminder3-days-threshold: 2
+    # Final reminder 1 minute before expiration (instead of 1 day)
+    reminder1-day-threshold: 1
+    # Grace period lasts 2 minutes (instead of 7 days)
+    grace-period-duration: 2m
+    # Trial lasts 5 minutes (instead of 14 days)
+    trial-duration: 5m
+
+# Optional: Also enable debug logging
+logging:
+  level:
+    com.possapp.backend.service.TrialExpirationService: DEBUG
+    com.possapp.backend.service.EmailService: DEBUG
+
+# ============================================================================
+# QUICK TESTING GUIDE
+# ============================================================================
+#
+# 1. Start backend with this profile:
+#    mvn spring-boot:run -Dspring-boot.run.profiles=seed,trial-debug
+#
+# 2. Create a new tenant (trial will last 5 minutes):
+#    - Register at http://localhost:8080
+#    - Trial starts immediately
+#
+# 3. Wait for notifications:
+#    - At 3 minutes: First email reminder (2 min threshold)
+#    - At 4 minutes: Second email reminder (1 min threshold)
+#    - At 5 minutes: Trial ends, grace period starts
+#    - At 7 minutes: Grace period ends, soft lock applied
+#
+# 4. Check emails in console or mail catcher
+#
+# ============================================================================
