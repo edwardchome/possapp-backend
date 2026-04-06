@@ -322,48 +322,103 @@ public class EmailService {
      * Send trial reminder email (3 days before expiration)
      */
     public void sendTrialReminderEmail(String toEmail, String tenantName, String companyName, int daysRemaining) {
+        log.info("[TrialEmail] Preparing trial reminder email to: {} ({} days remaining)", toEmail, daysRemaining);
+        
         String subject = String.format("Your PossApp Trial Expires in %d Days - Upgrade Now", daysRemaining);
         String upgradeUrl = buildUpgradeUrl();
         String htmlBody = buildTrialReminderEmailBody(companyName, tenantName, daysRemaining, upgradeUrl);
         
-        sendHtmlEmail(toEmail, subject, htmlBody);
-        log.info("Trial reminder email sent to: {} ({} days remaining)", toEmail, daysRemaining);
+        try {
+            sendHtmlEmailSync(toEmail, subject, htmlBody);
+            log.info("[TrialEmail] Trial reminder email sent successfully to: {}", toEmail);
+        } catch (Exception e) {
+            log.error("[TrialEmail] Failed to send trial reminder email to: {}", toEmail, e);
+            throw e;
+        }
     }
     
     /**
      * Send trial ending soon email (1 day before expiration)
      */
     public void sendTrialEndingSoonEmail(String toEmail, String tenantName, String companyName) {
+        log.info("[TrialEmail] Preparing trial ending soon email to: {}", toEmail);
+        
         String subject = "URGENT: Your PossApp Trial Ends Tomorrow - Don't Lose Access!";
         String upgradeUrl = buildUpgradeUrl();
         String htmlBody = buildTrialEndingSoonEmailBody(companyName, tenantName, upgradeUrl);
         
-        sendHtmlEmail(toEmail, subject, htmlBody);
-        log.info("Trial ending soon email sent to: {}", toEmail);
+        try {
+            sendHtmlEmailSync(toEmail, subject, htmlBody);
+            log.info("[TrialEmail] Trial ending soon email sent successfully to: {}", toEmail);
+        } catch (Exception e) {
+            log.error("[TrialEmail] Failed to send trial ending soon email to: {}", toEmail, e);
+            throw e;
+        }
     }
     
     /**
      * Send trial ended email
      */
     public void sendTrialEndedEmail(String toEmail, String tenantName, String companyName) {
+        log.info("[TrialEmail] Preparing trial ended email to: {}", toEmail);
+        
         String subject = "Your PossApp Trial Has Ended - Upgrade to Continue";
         String upgradeUrl = buildUpgradeUrl();
         String htmlBody = buildTrialEndedEmailBody(companyName, tenantName, upgradeUrl);
         
-        sendHtmlEmail(toEmail, subject, htmlBody);
-        log.info("Trial ended email sent to: {}", toEmail);
+        try {
+            sendHtmlEmailSync(toEmail, subject, htmlBody);
+            log.info("[TrialEmail] Trial ended email sent successfully to: {}", toEmail);
+        } catch (Exception e) {
+            log.error("[TrialEmail] Failed to send trial ended email to: {}", toEmail, e);
+            throw e;
+        }
     }
     
     /**
      * Send grace period ended email (soft lock activated)
      */
     public void sendGracePeriodEndedEmail(String toEmail, String tenantName, String companyName) {
+        log.info("[TrialEmail] Preparing grace period ended email to: {}", toEmail);
+        
         String subject = "URGENT: Your PossApp Account is Now Read-Only - Upgrade Required";
         String upgradeUrl = buildUpgradeUrl();
         String htmlBody = buildGracePeriodEndedEmailBody(companyName, tenantName, upgradeUrl);
         
-        sendHtmlEmail(toEmail, subject, htmlBody);
-        log.info("Grace period ended email sent to: {}", toEmail);
+        try {
+            sendHtmlEmailSync(toEmail, subject, htmlBody);
+            log.info("[TrialEmail] Grace period ended email sent successfully to: {}", toEmail);
+        } catch (Exception e) {
+            log.error("[TrialEmail] Failed to send grace period ended email to: {}", toEmail, e);
+            throw e;
+        }
+    }
+    
+    /**
+     * Send HTML email synchronously (without @Async)
+     * Used for trial emails to ensure proper error handling
+     */
+    private void sendHtmlEmailSync(String toEmail, String subject, String htmlBody) {
+        try {
+            log.info("[EmailService] Creating MIME message for: {}", toEmail);
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            
+            helper.setFrom(fromEmail);
+            helper.setTo(toEmail);
+            helper.setSubject(subject);
+            helper.setText(htmlBody, true);
+            
+            log.info("[EmailService] Sending email via mailSender to: {}", toEmail);
+            mailSender.send(message);
+            log.info("[EmailService] Email sent successfully to: {}", toEmail);
+        } catch (MessagingException e) {
+            log.error("[EmailService] MessagingException while sending email to: {} - {}", toEmail, e.getMessage(), e);
+            throw new RuntimeException("Failed to send email", e);
+        } catch (Exception e) {
+            log.error("[EmailService] Unexpected error while sending email to: {} - {}", toEmail, e.getMessage(), e);
+            throw new RuntimeException("Failed to send email", e);
+        }
     }
     
     private String buildUpgradeUrl() {
