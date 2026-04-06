@@ -65,6 +65,15 @@ public class DatabaseSeeder {
     private static final String DEFAULT_PASSWORD = "password123";
 
     /**
+     * Trial state enum for test tenants
+     */
+    private enum TrialState {
+        EXPIRED,        // Trial ended, soft locked (EXPIRED status)
+        ENDING_SOON,    // Less than 3 days left in trial
+        GRACE_PERIOD    // In 7-day grace period after trial ended
+    }
+
+    /**
      * Main entry point to seed all data
      * Note: Not @Transactional because TenantService.registerTenant handles its own transactions
      */
@@ -151,13 +160,68 @@ public class DatabaseSeeder {
                 getFashionProducts()
             ));
 
+            // Trial State Test Tenants
+            log.info("\n----------------------------------------");
+            log.info("Creating Trial State Test Tenants...");
+            log.info("----------------------------------------");
+
+            // Tenant 4: Trial Expired (Trial ended, soft locked)
+            seedTrialTestTenant(new TenantConfig(
+                "trialexpired",
+                "Expired Trial Store",
+                "admin@trialexpired.com",
+                SubscriptionPlan.BUSINESS,
+                Arrays.asList(
+                    new UserData("admin@trialexpired.com", "Admin", "User", "ADMIN"),
+                    new UserData("cashier@trialexpired.com", "Cashier", "User", "USER")
+                ),
+                Arrays.asList(
+                    new BranchData("Main Store", "MAIN", true, true)
+                ),
+                getGroceryProducts()
+            ), TrialState.EXPIRED);
+
+            // Tenant 5: Trial Ending Soon (2 days left)
+            seedTrialTestTenant(new TenantConfig(
+                "trialending",
+                "Trial Ending Soon Store",
+                "admin@trialending.com",
+                SubscriptionPlan.BUSINESS,
+                Arrays.asList(
+                    new UserData("admin@trialending.com", "Admin", "User", "ADMIN"),
+                    new UserData("manager@trialending.com", "Manager", "User", "MANAGER")
+                ),
+                Arrays.asList(
+                    new BranchData("Main Store", "MAIN", true, true)
+                ),
+                getElectronicsProducts()
+            ), TrialState.ENDING_SOON);
+
+            // Tenant 6: In Grace Period (5 days into grace period)
+            seedTrialTestTenant(new TenantConfig(
+                "graceperiod",
+                "Grace Period Store",
+                "admin@graceperiod.com",
+                SubscriptionPlan.STARTER,
+                Arrays.asList(
+                    new UserData("admin@graceperiod.com", "Admin", "User", "ADMIN")
+                ),
+                Arrays.asList(
+                    new BranchData("Main Store", "MAIN", true, true)
+                ),
+                getFashionProducts()
+            ), TrialState.GRACE_PERIOD);
+
             log.info("========================================");
             log.info("Database Seeding Completed Successfully!");
             log.info("========================================");
-            log.info("Created 3 tenants with different subscription plans:");
-            log.info("  1. TechNova Electronics - STARTER plan (2 users, 1 branch)");
-            log.info("  2. FreshMart Grocery - BUSINESS plan (3 users, 3 branches)");
-            log.info("  3. StyleHub Fashion - ENTERPRISE plan (5 users, 5 branches)");
+            log.info("Created 6 tenants with different subscription states:");
+            log.info("  1. TechNova Electronics - STARTER plan (ACTIVE, 2 users, 1 branch)");
+            log.info("  2. FreshMart Grocery - BUSINESS plan (ACTIVE, 3 users, 3 branches)");
+            log.info("  3. StyleHub Fashion - ENTERPRISE plan (ACTIVE, 5 users, 5 branches)");
+            log.info("  4. Expired Trial Store - BUSINESS plan (EXPIRED/Soft Locked, 2 users, 1 branch)");
+            log.info("  5. Trial Ending Soon Store - BUSINESS plan (TRIAL, 2 days left, 2 users, 1 branch)");
+            log.info("  6. Grace Period Store - STARTER plan (GRACE PERIOD, 5 days left, 1 user, 1 branch)");
             log.info("Each tenant has:");
             log.info("  - 20 products (~6-7 per branch, distributed)");
             log.info("  - ~300-450 sales receipts over 3 months per branch");
@@ -166,6 +230,9 @@ public class DatabaseSeeder {
             log.info("  - TechNova: admin@technova.com, cashier@technova.com / {}", DEFAULT_PASSWORD);
             log.info("  - FreshMart: admin@freshmart.com, manager@freshmart.com, cashier@freshmart.com / {}", DEFAULT_PASSWORD);
             log.info("  - StyleHub: admin@stylehub.com, manager@stylehub.com, cashier1@stylehub.com, cashier2@stylehub.com, supervisor@stylehub.com / {}", DEFAULT_PASSWORD);
+            log.info("  - Trial Expired: admin@trialexpired.com, cashier@trialexpired.com / {}", DEFAULT_PASSWORD);
+            log.info("  - Trial Ending: admin@trialending.com, manager@trialending.com / {}", DEFAULT_PASSWORD);
+            log.info("  - Grace Period: admin@graceperiod.com / {}", DEFAULT_PASSWORD);
             
         } catch (Exception e) {
             log.error("Error during database seeding: {}", e.getMessage(), e);
@@ -249,6 +316,164 @@ public class DatabaseSeeder {
             throw new RuntimeException("Failed to seed tenant: " + config.schemaName, e);
         } finally {
             TenantContext.clear();
+        }
+    }
+
+    /**
+     * Seed a tenant with specific trial state for testing
+     */
+    private void seedTrialTestTenant(TenantConfig config, TrialState trialState) {
+        log.info("\n----------------------------------------");
+        log.info("Seeding trial test tenant: {} (state: {})", config.schemaName, trialState);
+        log.info("----------------------------------------");
+        
+        // Check if tenant already exists
+        if (tenantExists(config.schemaName)) {
+            log.warn("Tenant '{}' already exists. Skipping.", config.schemaName);
+            return;
+        }
+        
+        // Drop schema if it exists from previous failed runs
+        dropSchemaIfExists(config.schemaName);
+        
+        // Create tenant
+        TenantRegistrationRequest request = new TenantRegistrationRequest();
+        request.setSchemaName(config.schemaName);
+        request.setCompanyName(config.companyName);
+        request.setAdminEmail(config.adminEmail);
+        request.setPassword(DEFAULT_PASSWORD);
+        request.setSubscriptionPlan(config.subscriptionPlan.name());
+        
+        TenantDto tenant = tenantService.registerTenant(request);
+        log.info("✓ Created tenant: {} (schema: {}) with {} plan", 
+            tenant.getCompanyName(), config.schemaName, config.subscriptionPlan.getDisplayName());
+        
+        // Update tenant with specific trial state
+        updateTenantTrialState(config.schemaName, config.subscriptionPlan, trialState, config.users.size(), config.branches.size());
+        
+        // Set tenant context for subsequent operations
+        TenantContext.setCurrentTenant(config.schemaName);
+        
+        try (Connection conn = dataSource.getConnection()) {
+            // Get the main branch ID
+            String mainBranchId = getMainBranchId(config.schemaName);
+            log.info("  ✓ Using main branch: {}", mainBranchId);
+            
+            // Create additional branches
+            List<BranchData> additionalBranches = config.branches.stream()
+                .filter(b -> !b.isMain())
+                .toList();
+            List<String> additionalBranchIds = createAdditionalBranches(config.schemaName, additionalBranches);
+            
+            // Combine all branch IDs
+            List<String> allBranchIds = new ArrayList<>();
+            allBranchIds.add(mainBranchId);
+            allBranchIds.addAll(additionalBranchIds);
+            
+            // Create additional users
+            createAdditionalUsers(config.schemaName, config.users, allBranchIds);
+            
+            // Create categories
+            createCategories(config.schemaName);
+            
+            // Create products for each branch
+            createProductsForBranches(config.schemaName, config.products, allBranchIds);
+            
+            // Get product codes
+            List<String> productCodes = getProductCodes(config.schemaName);
+            
+            // Create sales data for each branch
+            createSalesData(config.schemaName, allBranchIds, productCodes, config.users);
+            
+            // Create inventory transactions
+            createInventoryTransactions(config.schemaName, allBranchIds, productCodes);
+            
+            log.info("✓ Completed seeding trial test tenant: {}", config.schemaName);
+            
+        } catch (Exception e) {
+            log.error("Error seeding trial test tenant {}: {}", config.schemaName, e.getMessage(), e);
+            throw new RuntimeException("Failed to seed trial test tenant: " + config.schemaName, e);
+        } finally {
+            TenantContext.clear();
+        }
+    }
+
+    /**
+     * Update tenant with specific trial state for testing
+     */
+    private void updateTenantTrialState(String schemaName, SubscriptionPlan plan, TrialState trialState, int userCount, int branchCount) {
+        try {
+            LocalDateTime now = LocalDateTime.now();
+            LocalDateTime trialEndsAt;
+            LocalDateTime gracePeriodEndsAt;
+            SubscriptionStatus status;
+            String stateDescription;
+            
+            switch (trialState) {
+                case EXPIRED:
+                    // Trial ended 2 days ago, grace period ended 1 day ago, now soft locked
+                    trialEndsAt = now.minusDays(2);
+                    gracePeriodEndsAt = now.minusDays(1); // 7-day grace period ended
+                    status = SubscriptionStatus.EXPIRED;
+                    stateDescription = "EXPIRED (Soft Locked) - Trial ended 2 days ago";
+                    break;
+                case ENDING_SOON:
+                    // Trial ends in 2 days
+                    trialEndsAt = now.plusDays(2);
+                    gracePeriodEndsAt = null;
+                    status = SubscriptionStatus.TRIAL;
+                    stateDescription = "TRIAL - 2 days remaining";
+                    break;
+                case GRACE_PERIOD:
+                    // Trial ended 5 days ago, in grace period (2 days remaining)
+                    trialEndsAt = now.minusDays(5);
+                    gracePeriodEndsAt = now.plusDays(2); // 7-day grace period, 2 days left
+                    status = SubscriptionStatus.PAST_DUE;
+                    stateDescription = "GRACE PERIOD - 2 days remaining (trial ended 5 days ago)";
+                    break;
+                default:
+                    throw new IllegalArgumentException("Unknown trial state: " + trialState);
+            }
+            
+            // Update tenant subscription
+            String updateSql = "UPDATE public.tenants SET subscription_plan = ?, subscription_status = ?, " +
+                "subscription_started_at = ?, current_period_end = ?, trial_ends_at = ?, " +
+                "grace_period_ends_at = ?, trial_reminder_sent = true, " +
+                "trial_ended_notification_sent = true, grace_period_notification_sent = true " +
+                "WHERE schema_name = ?";
+            jdbcTemplate.update(updateSql, 
+                plan.name(), 
+                status.name(), 
+                trialEndsAt.minusDays(14), // Trial started 14 days before it ends
+                trialEndsAt, // current_period_end is when trial ends
+                trialEndsAt, 
+                gracePeriodEndsAt, 
+                schemaName);
+            
+            // Get tenant ID
+            UUID tenantId = jdbcTemplate.queryForObject(
+                "SELECT id FROM public.tenants WHERE schema_name = ?", UUID.class, schemaName);
+            
+            // Create or update tenant usage record
+            String updateUsageSql = "UPDATE public.tenant_usage SET current_users = ?, current_branches = ?, " +
+                "calculated_at = CURRENT_TIMESTAMP WHERE tenant_id = ?::uuid";
+            int updated = jdbcTemplate.update(updateUsageSql, userCount, branchCount, tenantId.toString());
+            
+            if (updated == 0) {
+                String insertUsageSql = "INSERT INTO public.tenant_usage (id, tenant_id, current_users, current_branches, current_products, current_monthly_transactions) " +
+                    "VALUES (gen_random_uuid(), ?::uuid, ?, ?, 0, 0)";
+                jdbcTemplate.update(insertUsageSql, tenantId.toString(), userCount, branchCount);
+            }
+            
+            log.info("  ✓ Set trial state to: {}", stateDescription);
+            log.info("     - Trial ends/ended at: {}", trialEndsAt.toLocalDate());
+            if (gracePeriodEndsAt != null) {
+                log.info("     - Grace period ends at: {}", gracePeriodEndsAt.toLocalDate());
+            }
+            log.info("     - Status: {}", status);
+            
+        } catch (Exception e) {
+            log.warn("  ⚠ Could not update trial state for {}: {}", schemaName, e.getMessage());
         }
     }
 
