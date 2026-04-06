@@ -313,4 +313,274 @@ public class EmailService {
         
         sendHtmlEmail(toEmail, subject, htmlBody);
     }
+    
+    // ============================================================================
+    // TRIAL REMINDER EMAILS
+    // ============================================================================
+    
+    /**
+     * Send trial reminder email (3 days before expiration)
+     */
+    public void sendTrialReminderEmail(String toEmail, String tenantName, String companyName, int daysRemaining) {
+        String subject = String.format("Your PossApp Trial Expires in %d Days - Upgrade Now", daysRemaining);
+        String upgradeUrl = buildUpgradeUrl();
+        String htmlBody = buildTrialReminderEmailBody(companyName, tenantName, daysRemaining, upgradeUrl);
+        
+        sendHtmlEmail(toEmail, subject, htmlBody);
+        log.info("Trial reminder email sent to: {} ({} days remaining)", toEmail, daysRemaining);
+    }
+    
+    /**
+     * Send trial ending soon email (1 day before expiration)
+     */
+    public void sendTrialEndingSoonEmail(String toEmail, String tenantName, String companyName) {
+        String subject = "URGENT: Your PossApp Trial Ends Tomorrow - Don't Lose Access!";
+        String upgradeUrl = buildUpgradeUrl();
+        String htmlBody = buildTrialEndingSoonEmailBody(companyName, tenantName, upgradeUrl);
+        
+        sendHtmlEmail(toEmail, subject, htmlBody);
+        log.info("Trial ending soon email sent to: {}", toEmail);
+    }
+    
+    /**
+     * Send trial ended email
+     */
+    public void sendTrialEndedEmail(String toEmail, String tenantName, String companyName) {
+        String subject = "Your PossApp Trial Has Ended - Upgrade to Continue";
+        String upgradeUrl = buildUpgradeUrl();
+        String htmlBody = buildTrialEndedEmailBody(companyName, tenantName, upgradeUrl);
+        
+        sendHtmlEmail(toEmail, subject, htmlBody);
+        log.info("Trial ended email sent to: {}", toEmail);
+    }
+    
+    /**
+     * Send grace period ended email (soft lock activated)
+     */
+    public void sendGracePeriodEndedEmail(String toEmail, String tenantName, String companyName) {
+        String subject = "URGENT: Your PossApp Account is Now Read-Only - Upgrade Required";
+        String upgradeUrl = buildUpgradeUrl();
+        String htmlBody = buildGracePeriodEndedEmailBody(companyName, tenantName, upgradeUrl);
+        
+        sendHtmlEmail(toEmail, subject, htmlBody);
+        log.info("Grace period ended email sent to: {}", toEmail);
+    }
+    
+    private String buildUpgradeUrl() {
+        String baseUrl = System.getenv("APP_BASE_URL");
+        if (baseUrl == null || baseUrl.isEmpty()) {
+            baseUrl = "http://localhost:8080";
+        }
+        return baseUrl + "/subscription";
+    }
+    
+    private String buildTrialReminderEmailBody(String companyName, String tenantId, int daysRemaining, String upgradeUrl) {
+        return String.format(
+            "<!DOCTYPE html>" +
+            "<html>" +
+            "<head>" +
+            "    <meta charset=\"UTF-8\">" +
+            "    <style>" +
+            "        body { font-family: Arial, sans-serif; background-color: #f5f5f5; margin: 0; padding: 20px; }" +
+            "        .container { max-width: 600px; margin: 0 auto; background-color: white; border-radius: 10px; padding: 40px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }" +
+            "        .header { text-align: center; margin-bottom: 30px; }" +
+            "        .header h1 { color: #4a6cf7; margin: 0; }" +
+            "        .content { margin-bottom: 30px; }" +
+            "        .warning-box { background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0; }" +
+            "        .warning-box h3 { margin-top: 0; color: #856404; }" +
+            "        .button { display: inline-block; background-color: #4a6cf7; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; }" +
+            "        .features { background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0; }" +
+            "        .features ul { margin: 10px 0; padding-left: 20px; }" +
+            "        .footer { text-align: center; color: #666; font-size: 12px; margin-top: 30px; }" +
+            "    </style>" +
+            "</head>" +
+            "<body>" +
+            "    <div class=\"container\">" +
+            "        <div class=\"header\">" +
+            "            <h1>Trial Expiring Soon</h1>" +
+            "        </div>" +
+            "        <div class=\"content\">" +
+            "            <h2>Hello %s,</h2>" +
+            "            <p>This is a friendly reminder that your <strong>PossApp</strong> trial period will expire in <strong>%d days</strong>.</p>" +
+            "            <div class=\"warning-box\">" +
+            "                <h3>⚠️ Don't Lose Access</h3>" +
+            "                <p>After your trial ends, you'll have a 7-day grace period before your account becomes read-only. Upgrade now to ensure uninterrupted service.</p>" +
+            "            </div>" +
+            "            <center><a href=\"%s\" class=\"button\">Upgrade My Account</a></center>" +
+            "            <div class=\"features\">" +
+            "                <h3>Why Upgrade?</h3>" +
+            "                <ul>" +
+            "                    <li>Unlimited access to all features</li>" +
+            "                    <li>Multiple users and branches</li>" +
+            "                    <li>Advanced reports and analytics</li>" +
+            "                    <li>Priority customer support</li>" +
+            "                    <li>No interruption to your business</li>" +
+            "                </ul>" +
+            "            </div>" +
+            "            <p>Questions? Reply to this email or contact our support team.</p>" +
+            "        </div>" +
+            "        <div class=\"footer\">" +
+            "            <p>Business ID: %s</p>" +
+            "            <p>&copy; 2025 PossApp. All rights reserved.</p>" +
+            "        </div>" +
+            "    </div>" +
+            "</body>" +
+            "</html>",
+            companyName, daysRemaining, upgradeUrl, tenantId
+        );
+    }
+    
+    private String buildTrialEndingSoonEmailBody(String companyName, String tenantId, String upgradeUrl) {
+        return String.format(
+            "<!DOCTYPE html>" +
+            "<html>" +
+            "<head>" +
+            "    <meta charset=\"UTF-8\">" +
+            "    <style>" +
+            "        body { font-family: Arial, sans-serif; background-color: #f5f5f5; margin: 0; padding: 20px; }" +
+            "        .container { max-width: 600px; margin: 0 auto; background-color: white; border-radius: 10px; padding: 40px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }" +
+            "        .header { text-align: center; margin-bottom: 30px; }" +
+            "        .header h1 { color: #dc2626; margin: 0; }" +
+            "        .content { margin-bottom: 30px; }" +
+            "        .urgent-box { background-color: #fee2e2; border-left: 4px solid #dc2626; padding: 15px; margin: 20px 0; }" +
+            "        .urgent-box h3 { margin-top: 0; color: #dc2626; }" +
+            "        .button { display: inline-block; background-color: #dc2626; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; }" +
+            "        .button:hover { background-color: #b91c1c; }" +
+            "        .footer { text-align: center; color: #666; font-size: 12px; margin-top: 30px; }" +
+            "    </style>" +
+            "</head>" +
+            "<body>" +
+            "    <div class=\"container\">" +
+            "        <div class=\"header\">" +
+            "            <h1>⚠️ Trial Ends Tomorrow</h1>" +
+            "        </div>" +
+            "        <div class=\"content\">" +
+            "            <h2>Hello %s,</h2>" +
+            "            <div class=\"urgent-box\">" +
+            "                <h3>URGENT: Last Chance!</h3>" +
+            "                <p>Your <strong>PossApp</strong> trial ends <strong>TOMORROW</strong>. After that, you'll have a 7-day grace period before your account becomes read-only.</p>" +
+            "            </div>" +
+            "            <p>Don't risk losing access to your business data. Upgrade now to:</p>" +
+            "            <ul>" +
+            "                <li>Continue using all features without interruption</li>" +
+            "                <li>Keep your data safe and accessible</li>" +
+            "                <li>Get priority support</li>" +
+            "            </ul>" +
+            "            <center><a href=\"%s\" class=\"button\">Upgrade Now - Don't Wait!</a></center>" +
+            "            <p style=\"text-align: center; color: #666; margin-top: 20px;\">Questions? Contact us immediately at support@possapp.com</p>" +
+            "        </div>" +
+            "        <div class=\"footer\">" +
+            "            <p>Business ID: %s</p>" +
+            "            <p>&copy; 2025 PossApp. All rights reserved.</p>" +
+            "        </div>" +
+            "    </div>" +
+            "</body>" +
+            "</html>",
+            companyName, upgradeUrl, tenantId
+        );
+    }
+    
+    private String buildTrialEndedEmailBody(String companyName, String tenantId, String upgradeUrl) {
+        return String.format(
+            "<!DOCTYPE html>" +
+            "<html>" +
+            "<head>" +
+            "    <meta charset=\"UTF-8\">" +
+            "    <style>" +
+            "        body { font-family: Arial, sans-serif; background-color: #f5f5f5; margin: 0; padding: 20px; }" +
+            "        .container { max-width: 600px; margin: 0 auto; background-color: white; border-radius: 10px; padding: 40px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }" +
+            "        .header { text-align: center; margin-bottom: 30px; }" +
+            "        .header h1 { color: #dc2626; margin: 0; }" +
+            "        .content { margin-bottom: 30px; }" +
+            "        .grace-box { background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0; }" +
+            "        .grace-box h3 { margin-top: 0; color: #856404; }" +
+            "        .button { display: inline-block; background-color: #4a6cf7; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; }" +
+            "        .footer { text-align: center; color: #666; font-size: 12px; margin-top: 30px; }" +
+            "    </style>" +
+            "</head>" +
+            "<body>" +
+            "    <div class=\"container\">" +
+            "        <div class=\"header\">" +
+            "            <h1>Trial Has Ended</h1>" +
+            "        </div>" +
+            "        <div class=\"content\">" +
+            "            <h2>Hello %s,</h2>" +
+            "            <p>Your <strong>PossApp</strong> trial period has ended.</p>" +
+            "            <div class=\"grace-box\">" +
+            "                <h3>7-Day Grace Period Active</h3>" +
+            "                <p>You now have a 7-day grace period to continue using PossApp while you decide to upgrade. After this period, your account will become read-only.</p>" +
+            "            </div>" +
+            "            <p>During the grace period:</p>" +
+            "            <ul>" +
+            "                <li>✓ You can still access all your data</li>" +
+            "                <li>✓ You can view reports and history</li>" +
+            "                <li>✗ You cannot create new sales or add products</li>" +
+            "            </ul>" +
+            "            <center><a href=\"%s\" class=\"button\">Upgrade Now</a></center>" +
+            "        </div>" +
+            "        <div class=\"footer\">" +
+            "            <p>Business ID: %s</p>" +
+            "            <p>&copy; 2025 PossApp. All rights reserved.</p>" +
+            "        </div>" +
+            "    </div>" +
+            "</body>" +
+            "</html>",
+            companyName, upgradeUrl, tenantId
+        );
+    }
+    
+    private String buildGracePeriodEndedEmailBody(String companyName, String tenantId, String upgradeUrl) {
+        return String.format(
+            "<!DOCTYPE html>" +
+            "<html>" +
+            "<head>" +
+            "    <meta charset=\"UTF-8\">" +
+            "    <style>" +
+            "        body { font-family: Arial, sans-serif; background-color: #f5f5f5; margin: 0; padding: 20px; }" +
+            "        .container { max-width: 600px; margin: 0 auto; background-color: white; border-radius: 10px; padding: 40px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }" +
+            "        .header { text-align: center; margin-bottom: 30px; }" +
+            "        .header h1 { color: #dc2626; margin: 0; }" +
+            "        .content { margin-bottom: 30px; }" +
+            "        .locked-box { background-color: #fee2e2; border: 2px solid #dc2626; padding: 20px; margin: 20px 0; text-align: center; }" +
+            "        .locked-box h3 { margin-top: 0; color: #dc2626; font-size: 24px; }" +
+            "        .button { display: inline-block; background-color: #dc2626; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; font-weight: bold; }" +
+            "        .button:hover { background-color: #b91c1c; }" +
+            "        .read-only { background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin: 20px 0; }" +
+            "        .footer { text-align: center; color: #666; font-size: 12px; margin-top: 30px; }" +
+            "    </style>" +
+            "</head>" +
+            "<body>" +
+            "    <div class=\"container\">" +
+            "        <div class=\"header\">" +
+            "            <h1>⚠️ Account Read-Only</h1>" +
+            "        </div>" +
+            "        <div class=\"content\">" +
+            "            <h2>Hello %s,</h2>" +
+            "            <div class=\"locked-box\">" +
+            "                <h3>Your Account is Now Read-Only</h3>" +
+            "                <p>Your trial and grace period have ended. Your account is now in read-only mode.</p>" +
+            "            </div>" +
+            "            <div class=\"read-only\">" +
+            "                <p><strong>What this means:</strong></p>" +
+            "                <ul>" +
+            "                    <li>✓ You can still view all your data</li>" +
+            "                    <li>✓ You can access reports and history</li>" +
+            "                    <li>✗ You cannot create sales or add products</li>" +
+            "                    <li>✗ You cannot add users or branches</li>" +
+            "                </ul>" +
+            "            </div>" +
+            "            <p style=\"text-align: center; font-size: 18px; color: #dc2626; font-weight: bold;\">Upgrade now to restore full access!</p>" +
+            "            <center><a href=\"%s\" class=\"button\">Upgrade Immediately</a></center>" +
+            "            <p style=\"text-align: center; margin-top: 20px;\">Need help? Contact us at support@possapp.com</p>" +
+            "        </div>" +
+            "        <div class=\"footer\">" +
+            "            <p>Business ID: %s</p>" +
+            "            <p>&copy; 2025 PossApp. All rights reserved.</p>" +
+            "        </div>" +
+            "    </div>" +
+            "</body>" +
+            "</html>",
+            companyName, upgradeUrl, tenantId
+        );
+    }
 }
