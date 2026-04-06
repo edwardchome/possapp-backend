@@ -86,21 +86,32 @@ public class TrialExpirationService {
     @Scheduled(cron = "0 0 2 * * ?")
     @Transactional
     public void processTrialExpirations() {
+        log.info("========================================");
         log.info("Starting trial expiration check...");
+        log.info("Debug mode: {}", debugConfig.isEnabled());
+        
+        int reminder3Days = getReminder3DaysThreshold();
+        int reminder1Day = getReminder1DayThreshold();
+        log.info("Reminder thresholds - 3-day: {}, 1-day: {}", reminder3Days, reminder1Day);
         
         // Check for trials ending soon (first reminder)
-        sendReminderNotifications(getReminder3DaysThreshold());
+        log.info("Checking for trials ending in {} days/minutes...", reminder3Days);
+        sendReminderNotifications(reminder3Days);
         
         // Check for trials ending very soon (final reminder)
-        sendReminderNotifications(getReminder1DayThreshold());
+        log.info("Checking for trials ending in {} days/minutes...", reminder1Day);
+        sendReminderNotifications(reminder1Day);
         
         // Process expired trials
+        log.info("Processing expired trials...");
         processExpiredTrials();
         
         // Process ended grace periods
+        log.info("Processing ended grace periods...");
         processEndedGracePeriods();
         
         log.info("Trial expiration check completed");
+        log.info("========================================");
     }
     
     /**
@@ -137,17 +148,27 @@ public class TrialExpirationService {
             nextWindow = targetDate.plusDays(1);
         }
         
+        log.info("Looking for trials with trialEndsAt between {} and {}", targetDate, nextWindow);
+        
         List<Tenant> trialsEndingSoon = tenantRepository.findBySubscriptionStatusAndTrialEndsAtBetween(
             SubscriptionStatus.TRIAL, targetDate, nextWindow);
         
+        log.info("Found {} trials ending soon", trialsEndingSoon.size());
+        
         for (Tenant tenant : trialsEndingSoon) {
+            log.info("Processing trial reminder for tenant: {} (email: {}), trialEndsAt: {}", 
+                tenant.getCompanyName(), tenant.getAdminEmail(), tenant.getTrialEndsAt());
+            
             // Skip if already sent reminder for this threshold (only for 3-day/production threshold)
             int prod3DayThreshold = PROD_REMINDER_3_DAYS;
             if (!debugConfig.isEnabled() && daysBeforeExpiration == prod3DayThreshold && tenant.isTrialReminderSent()) {
+                log.info("Skipping {} - reminder already sent", tenant.getCompanyName());
                 continue;
             }
             
             try {
+                log.info("Sending trial ending email to: {} ({} days/minutes remaining)", 
+                    tenant.getAdminEmail(), daysBeforeExpiration);
                 sendTrialEndingEmail(tenant, daysBeforeExpiration);
                 
                 // Mark reminder as sent (only for first reminder)
@@ -156,9 +177,9 @@ public class TrialExpirationService {
                     tenantRepository.save(tenant);
                 }
                 
-                log.info("Sent {}-day reminder to tenant: {}", daysBeforeExpiration, tenant.getCompanyName());
+                log.info("Successfully sent {}-day reminder to tenant: {}", daysBeforeExpiration, tenant.getCompanyName());
             } catch (Exception e) {
-                log.error("Failed to send reminder to {}: {}", tenant.getAdminEmail(), e.getMessage());
+                log.error("Failed to send reminder to {}: {}", tenant.getAdminEmail(), e.getMessage(), e);
             }
         }
     }
@@ -175,15 +196,26 @@ public class TrialExpirationService {
         
         // Find trials that just expired (ended in last 24 hours)
         LocalDateTime yesterday = now.minusDays(1);
+        log.info("Looking for expired trials between {} and {}", yesterday, now);
+        
         List<Tenant> expiredTrials = tenantRepository.findBySubscriptionStatusAndTrialEndsAtBetween(
             SubscriptionStatus.TRIAL, yesterday, now);
         
+        log.info("Found {} expired trials", expiredTrials.size());
+        
         for (Tenant tenant : expiredTrials) {
+            log.info("Processing expired trial for tenant: {} (email: {})", 
+                tenant.getCompanyName(), tenant.getAdminEmail());
+            
             try {
                 // Send trial ended notification
                 if (!tenant.isTrialEndedNotificationSent()) {
+                    log.info("Sending trial ended email to: {}", tenant.getAdminEmail());
                     sendTrialEndedEmail(tenant);
                     tenant.setTrialEndedNotificationSent(true);
+                    log.info("Trial ended email sent successfully to: {}", tenant.getAdminEmail());
+                } else {
+                    log.info("Trial ended email already sent to: {}", tenant.getAdminEmail());
                 }
                 
                 // Start grace period (7 days in production, configurable in debug)
@@ -220,17 +252,28 @@ public class TrialExpirationService {
         
         // Find tenants whose grace period ended in last 24 hours
         LocalDateTime yesterday = now.minusDays(1);
+        log.info("Looking for ended grace periods between {} and {}", yesterday, now);
+        
         List<Tenant> endedGracePeriods = tenantRepository.findByGracePeriodEndsAtBetween(
             yesterday, now);
         
+        log.info("Found {} ended grace periods", endedGracePeriods.size());
+        
         for (Tenant tenant : endedGracePeriods) {
+            log.info("Processing ended grace period for tenant: {} (email: {}), status: {}", 
+                tenant.getCompanyName(), tenant.getAdminEmail(), tenant.getSubscriptionStatus());
+            
             // Only process if not already soft locked
             if (tenant.getSubscriptionStatus() != SubscriptionStatus.SUSPENDED) {
                 try {
                     if (!tenant.isGracePeriodNotificationSent()) {
+                        log.info("Sending grace period ended email to: {}", tenant.getAdminEmail());
                         sendGracePeriodEndedEmail(tenant);
                         tenant.setGracePeriodNotificationSent(true);
                         tenantRepository.save(tenant);
+                        log.info("Grace period ended email sent successfully to: {}", tenant.getAdminEmail());
+                    } else {
+                        log.info("Grace period ended email already sent to: {}", tenant.getAdminEmail());
                     }
                     
                     log.info("Grace period ended for tenant: {}. Soft lock applied.", 
