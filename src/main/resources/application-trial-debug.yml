@@ -20,8 +20,8 @@
 trial:
   debug:
     enabled: true
-    # Check for trial expirations every 1 minute (instead of daily)
-    check-interval: 1m
+    # Check for trial expirations every 1 minute (60000ms) instead of daily
+    check-interval-ms: 60000
     # First reminder 2 minutes before expiration (instead of 3 days)
     reminder3-days-threshold: 2
     # Final reminder 1 minute before expiration (instead of 1 day)

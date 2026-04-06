@@ -105,9 +105,10 @@ public class TrialExpirationService {
     
     /**
      * Debug scheduled task: Run frequently when debug mode is enabled
-     * This runs every minute in debug mode for rapid testing
+     * This runs every minute (60000ms) in debug mode for rapid testing
+     * Default is 24 hours (86400000ms) when not in debug mode
      */
-    @Scheduled(fixedDelayString = "${trial.debug.check-interval:24h}", initialDelay = 60000)
+    @Scheduled(fixedDelayString = "${trial.debug.check-interval-ms:86400000}", initialDelay = 60000)
     @Transactional
     public void processTrialExpirationsDebug() {
         if (debugConfig.isEnabled()) {
