@@ -19,6 +19,7 @@ import com.possapp.backend.repository.TenantRepository;
 import com.possapp.backend.repository.TenantUsageRepository;
 import com.possapp.backend.repository.UnitOfMeasureRepository;
 import com.possapp.backend.repository.UserRepository;
+import com.possapp.backend.config.TrialDebugConfig;
 import com.possapp.backend.service.TenantService;
 import com.possapp.backend.tenant.TenantContext;
 import lombok.RequiredArgsConstructor;
@@ -61,6 +62,7 @@ public class DatabaseSeeder {
     private final DataSource dataSource;
     private final PasswordEncoder passwordEncoder;
     private final JdbcTemplate jdbcTemplate;
+    private final TrialDebugConfig trialDebugConfig;
 
     private static final String DEFAULT_PASSWORD = "password123";
 
@@ -400,6 +402,7 @@ public class DatabaseSeeder {
 
     /**
      * Update tenant with specific trial state for testing
+     * In debug mode, uses minutes instead of days for rapid testing
      */
     private void updateTenantTrialState(String schemaName, SubscriptionPlan plan, TrialState trialState, int userCount, int branchCount) {
         try {
@@ -409,42 +412,56 @@ public class DatabaseSeeder {
             SubscriptionStatus status;
             String stateDescription;
             
+            // Check if debug mode is enabled - use minutes instead of days
+            boolean debugMode = trialDebugConfig != null && trialDebugConfig.isEnabled();
+            
             switch (trialState) {
                 case EXPIRED:
-                    // Trial ended 2 days ago, grace period ended 1 day ago, now soft locked
-                    trialEndsAt = now.minusDays(2);
-                    gracePeriodEndsAt = now.minusDays(1); // 7-day grace period ended
+                    // Trial ended 2 days ago (or 2 min in debug), grace period ended 1 day ago (or 1 min in debug)
+                    trialEndsAt = debugMode ? now.minusMinutes(2) : now.minusDays(2);
+                    gracePeriodEndsAt = debugMode ? now.minusMinutes(1) : now.minusDays(1);
                     status = SubscriptionStatus.EXPIRED;
-                    stateDescription = "EXPIRED (Soft Locked) - Trial ended 2 days ago";
+                    stateDescription = debugMode 
+                        ? "EXPIRED (Soft Locked) - Trial ended 2 min ago"
+                        : "EXPIRED (Soft Locked) - Trial ended 2 days ago";
                     break;
                 case ENDING_SOON:
-                    // Trial ends in 2 days
-                    trialEndsAt = now.plusDays(2);
+                    // Trial ends in 2 days (or 2 min in debug)
+                    trialEndsAt = debugMode ? now.plusMinutes(2) : now.plusDays(2);
                     gracePeriodEndsAt = null;
                     status = SubscriptionStatus.TRIAL;
-                    stateDescription = "TRIAL - 2 days remaining";
+                    stateDescription = debugMode 
+                        ? "TRIAL - 2 minutes remaining"
+                        : "TRIAL - 2 days remaining";
                     break;
                 case GRACE_PERIOD:
-                    // Trial ended 5 days ago, in grace period (2 days remaining)
-                    trialEndsAt = now.minusDays(5);
-                    gracePeriodEndsAt = now.plusDays(2); // 7-day grace period, 2 days left
+                    // Trial ended 5 days ago (or 5 min in debug), in grace period
+                    trialEndsAt = debugMode ? now.minusMinutes(5) : now.minusDays(5);
+                    gracePeriodEndsAt = debugMode ? now.plusMinutes(2) : now.plusDays(2);
                     status = SubscriptionStatus.PAST_DUE;
-                    stateDescription = "GRACE PERIOD - 2 days remaining (trial ended 5 days ago)";
+                    stateDescription = debugMode 
+                        ? "GRACE PERIOD - 2 minutes remaining (trial ended 5 min ago)"
+                        : "GRACE PERIOD - 2 days remaining (trial ended 5 days ago)";
                     break;
                 default:
                     throw new IllegalArgumentException("Unknown trial state: " + trialState);
             }
             
+            // Calculate trial start date (14 days or 14 min before trial ends)
+            LocalDateTime trialStartedAt = debugMode 
+                ? trialEndsAt.minusMinutes(14) 
+                : trialEndsAt.minusDays(14);
+            
             // Update tenant subscription
             String updateSql = "UPDATE public.tenants SET subscription_plan = ?, subscription_status = ?, " +
                 "subscription_started_at = ?, current_period_end = ?, trial_ends_at = ?, " +
-                "grace_period_ends_at = ?, trial_reminder_sent = true, " +
-                "trial_ended_notification_sent = true, grace_period_notification_sent = true " +
+                "grace_period_ends_at = ?, trial_reminder_sent = false, " +
+                "trial_ended_notification_sent = false, grace_period_notification_sent = false " +
                 "WHERE schema_name = ?";
             jdbcTemplate.update(updateSql, 
                 plan.name(), 
                 status.name(), 
-                trialEndsAt.minusDays(14), // Trial started 14 days before it ends
+                trialStartedAt,
                 trialEndsAt, // current_period_end is when trial ends
                 trialEndsAt, 
                 gracePeriodEndsAt, 
@@ -466,9 +483,16 @@ public class DatabaseSeeder {
             }
             
             log.info("  ✓ Set trial state to: {}", stateDescription);
-            log.info("     - Trial ends/ended at: {}", trialEndsAt.toLocalDate());
-            if (gracePeriodEndsAt != null) {
-                log.info("     - Grace period ends at: {}", gracePeriodEndsAt.toLocalDate());
+            if (debugMode) {
+                log.info("     - Trial ends/ended at: {}", trialEndsAt);
+                if (gracePeriodEndsAt != null) {
+                    log.info("     - Grace period ends at: {}", gracePeriodEndsAt);
+                }
+            } else {
+                log.info("     - Trial ends/ended at: {}", trialEndsAt.toLocalDate());
+                if (gracePeriodEndsAt != null) {
+                    log.info("     - Grace period ends at: {}", gracePeriodEndsAt.toLocalDate());
+                }
             }
             log.info("     - Status: {}", status);
             
